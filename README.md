@@ -1,0 +1,107 @@
+# Mensura
+
+Mensura is a small spatial math and geometry kernel for TypeScript game and
+editor runtimes.
+
+It is intentionally lower-level than Geukbit. Mensura should not know about
+scenes, entities, components, assets, inspectors, materials, or renderers.
+
+## Scope
+
+Mensura owns reusable math primitives:
+
+- floating-point comparison and ULP helpers
+- conversion loss functions for `number -> f32`
+- vectors, quaternions, and matrices
+- rays, planes, AABBs, spheres, and frustums
+- intersection and overlap tests
+- grid/world coordinate conversion
+- transform compose/decompose helpers
+
+## Coordinate And Memory Policy
+
+Mensura uses a right-handed world coordinate system:
+
+- `+X` is right
+- `+Y` is up
+- `-Z` is forward
+
+Matrices use column-major storage and column-vector multiplication:
+
+- points are transformed as `p' = M * p`
+- transform composition is `M = T * R * S`
+- model-view-projection is `MVP = P * V * M`
+
+Projection helpers target WebGPU-style clip depth by default:
+
+- NDC X: `-1..1`
+- NDC Y: `-1..1`
+- NDC Z: `0..1`
+
+The public API uses immutable `number` objects by default. Hot-path APIs use
+`Into` suffixes and write into caller-owned outputs. Packed GPU bridges use
+`Float32Array`. Binary projection bridges use `DataView`.
+
+Ray intersections only return hits with `distance >= 0`. AABB point containment
+is inclusive. Grid cell ownership uses `Math.floor`.
+
+See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
+
+## Module Layout
+
+```txt
+@exornea/mensura           facade for the whole kernel
+@exornea/mensura/core      float, vector, and matrix math
+@exornea/mensura/geometry  rays, planes, bounds, spheres, and frustums
+@exornea/mensura/gpu       WebGPU projection and packed Float32Array bridges
+@exornea/mensura/unsafe    unchecked binary and typed-array projection helpers
+```
+
+`unsafe` is intentionally not re-exported by the root facade. Import it by name
+when a caller owns the buffer layout, bounds checks, and aliasing contract.
+
+## First API
+
+```ts
+import {
+  distanceSq3,
+  lossF32,
+  nearlyEqualUlpsF32,
+  ulpDiffF32,
+  vec3
+} from "@exornea/mensura/core";
+import {
+  aabb,
+  frustumFromMatrixWebGpu,
+  frustumIntersectsAabb,
+  ray,
+  rayAabbHitDistance
+} from "@exornea/mensura/geometry";
+import { mat4PerspectiveWebGpuRh } from "@exornea/mensura/gpu";
+
+const a = vec3(0, 0, 0);
+const b = vec3(1, 2, 3);
+const projection = mat4PerspectiveWebGpuRh(Math.PI / 2, 16 / 9, 0.1, 100);
+const frustum = frustumFromMatrixWebGpu(projection);
+const bounds = aabb(vec3(-1, -1, -5), vec3(1, 1, -3));
+const pickRay = ray(vec3(0, 0, 0), vec3(0, 0, -1));
+
+console.log(distanceSq3(a, b));
+console.log(ulpDiffF32(1, Math.fround(1 + Number.EPSILON)));
+console.log(nearlyEqualUlpsF32(1, Math.fround(1), 0));
+console.log(lossF32(1 + Number.EPSILON));
+console.log(frustumIntersectsAabb(frustum, bounds));
+console.log(rayAabbHitDistance(pickRay, bounds));
+```
+
+## Non-Goals
+
+- no renderer handles
+- no scene graph
+- no entity/component model
+- no asset or material catalog
+- no physics engine
+- no editor UI state
+
+Mensura should remain a geometry kernel that Geukbit, Zeno benchmarks, and other
+game/editor packages can share.
