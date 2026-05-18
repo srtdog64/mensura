@@ -67,6 +67,13 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/unsafe    unchecked binary and typed-array projection helpers
 ```
 
+For `0.1.x`, `core`, `geometry`, `query`, `gpu`, `layout`, `data`, and
+`batch` are the stable release surface. `collision`, `accel`, and `world` are
+experimental dogfood layers. `physics` is a compatibility facade. `unsafe` is
+explicitly unsafe and opt-in.
+
+See [API Stability](docs/api-stability.md) for the release contract.
+
 The root facade exports the primary layers. `physics` remains as a compatibility
 facade for older imports, but new code should import `query`, `collision`,
 `accel`, and `world` by responsibility. `layout` describes byte-level records;

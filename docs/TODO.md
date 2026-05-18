@@ -24,18 +24,14 @@ Already in place:
 
 ## P0: API Freeze Prep
 
-- Review root facade exports and decide which subpaths are stable for v0.1:
-  `core`, `geometry`, `query`, `gpu`, `layout`, `data`, `batch`, `unsafe`.
-- Keep `physics` as a compatibility facade only. Do not add new primary APIs
-  there.
-- Decide whether `collision`, `accel`, and `world` are experimental or v0.1
-  public. If experimental, document that clearly in README.
-- Add a short `docs/api-stability.md` with stable, experimental, and unsafe
-  surfaces.
-- Make naming consistent:
+- Maintain `docs/api-stability.md` as the source of truth for stable 0.1,
+  experimental, compatibility, and unsafe surfaces.
+- Keep naming consistent:
   - `Into` means caller-owned single output.
   - `IntoMany` means object-array batch.
   - `unsafe*F32Many` means packed Float32Array batch.
+- Before promoting `collision`, `accel`, or `world` from experimental, add the
+  witness coverage listed below and update README plus `docs/api-stability.md`.
 
 ## P1: Collision Witnesses
 

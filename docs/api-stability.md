@@ -1,0 +1,83 @@
+# API Stability
+
+Mensura is preparing for a `0.1.x` initial release. This document defines which
+entry points are intended to stay stable during the `0.1.x` line and which ones
+are still allowed to change.
+
+## Release Label
+
+Current package line: `0.1.x`.
+
+The package is useful for integration and dogfooding, but it is still pre-`1.0`.
+Breaking changes are allowed before `1.0`, but they should be deliberate,
+documented, and backed by tests.
+
+## Stable 0.1 Surface
+
+These layers are the primary public surface for `0.1.x`:
+
+| Subpath | Status | Notes |
+|---|---|---|
+| `@exornea/mensura/core` | Stable 0.1 | Float policy, `Result`, vec3/vec4, mat3/mat4, quat, euler, dual-quat. |
+| `@exornea/mensura/geometry` | Stable 0.1 | Shape construction and primitive geometry values. |
+| `@exornea/mensura/query` | Stable 0.1 | Ray hits, overlap tests, and frustum culling helpers. |
+| `@exornea/mensura/gpu` | Stable 0.1 | WebGPU projection helpers and checked Float32Array bridges. |
+| `@exornea/mensura/layout` | Stable 0.1 | WGSL-compatible layout constants and byte offsets. |
+| `@exornea/mensura/data` | Stable 0.1 | Checked `Result`-first DataView projection layer. |
+| `@exornea/mensura/batch` | Stable 0.1 | Object-array `*IntoMany` kernels that preserve inspectable value shapes. |
+
+The root facade re-exports the main stable 0.1 layers for convenience. New
+code that wants narrow ownership should import from the layer-specific subpath.
+
+## Experimental Surface
+
+These layers are public enough to dogfood, but not yet stable enough to freeze:
+
+| Subpath | Status | Reason |
+|---|---|---|
+| `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA need more witness tests for containment, touching, degeneracy, and convergence limits. |
+| `@exornea/mensura/accel` | Experimental | BVH behavior is tested, but builder policy and traversal result contracts may still change. |
+| `@exornea/mensura/world` | Experimental | Useful orchestration layer, but body lifecycle and broadphase ownership are not finalized. |
+| `@exornea/mensura/physics` | Compatibility | Re-export facade for older imports. Do not add new primary APIs here. |
+
+Experimental APIs should remain tested, but callers should expect naming,
+result-shape, and policy changes before a stable release.
+
+## Unsafe Surface
+
+`@exornea/mensura/unsafe` is explicitly unsafe and is intentionally not part of
+the root facade.
+
+Unsafe APIs may skip validation, bounds checks, allocation safety, and aliasing
+guards. A caller using this layer owns:
+
+- buffer length and offset correctness.
+- packed `Float32Array` stride and layout.
+- `DataView` byte alignment.
+- aliasing behavior unless a function documents alias safety.
+- `SharedArrayBuffer` publication and `Atomics` protocol.
+
+Unsafe function names must start with `unsafe`. Packed batch kernels use the
+`unsafe*F32Many` naming pattern.
+
+## Stability Rules
+
+- `Into` means a single caller-owned output value.
+- `IntoMany` means an object-array batch kernel.
+- `unsafe*F32Many` means a packed `Float32Array` batch kernel.
+- Fallible boundary APIs should return `Result<T>` instead of throwing.
+- Root exports should stay conservative. Prefer adding new experimental work
+  under a named layer before promoting it to the root facade.
+- WebAssembly is deferred. If revived, it must land under an explicit `wasm` or
+  `unsafe/wasm` layer with documented `WebAssembly.Memory` ownership,
+  fallback behavior, generation steps, and binary provenance.
+
+## Promotion Criteria
+
+An experimental API can move to the stable 0.1 surface when it has:
+
+- deterministic unit tests for common cases and edge cases.
+- at least one stress or witness test matching a realistic workload.
+- documented failure semantics.
+- no hidden module-level scratch state in hot paths.
+- benchmark coverage if the API exists primarily for performance.
