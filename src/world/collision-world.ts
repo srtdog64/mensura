@@ -1,7 +1,9 @@
-import type { Bvh } from "./bvh.js";
-import { buildBvh, bvhRaycast } from "./bvh.js";
+import type { Bvh } from "../accel/bvh.js";
+import { buildBvh, bvhRaycast } from "../accel/bvh.js";
+import { AccelContext } from "../accel/context.js";
 import type { Aabb } from "../geometry/aabb.js";
 import type { Ray } from "../geometry/ray.js";
+import { rayIntersectsAabb } from "../geometry/ray.js";
 import type { Result } from "../core/result.js";
 import { ok, err } from "../core/result.js";
 
@@ -13,6 +15,8 @@ export interface CollisionBody {
 export class CollisionWorld {
   private bodies: Map<number, CollisionBody> = new Map();
   private bvh: Bvh | null = null;
+  private orderedBodies: CollisionBody[] = [];
+  private accelCtx: AccelContext = new AccelContext();
   private nextId = 1;
 
   public addBody(aabb: Aabb): number {
@@ -31,7 +35,14 @@ export class CollisionWorld {
   }
 
   public updateBvh(): Result<Bvh> {
-    const primitives = Array.from(this.bodies.values()).map(b => b.aabb);
+    this.orderedBodies.length = 0;
+    const primitives: Aabb[] = [];
+
+    for (const body of this.bodies.values()) {
+      this.orderedBodies.push(body);
+      primitives.push(body.aabb);
+    }
+
     if (primitives.length === 0) {
       return err({
         code: "BVH_EMPTY_PRIMITIVES",
@@ -52,8 +63,17 @@ export class CollisionWorld {
     if (!this.bvh) {
       return [];
     }
-    const indices = bvhRaycast(this.bvh, ray);
-    const bodyIds = Array.from(this.bodies.keys());
-    return indices.map(idx => bodyIds[idx]);
+    const indices = bvhRaycast(this.bvh, ray, this.accelCtx);
+    const hits: number[] = [];
+    const ordered = this.orderedBodies;
+
+    for (let i = 0; i < indices.length; i++) {
+      const body = ordered[indices[i]];
+      if (body && rayIntersectsAabb(ray, body.aabb)) {
+        hits.push(body.id);
+      }
+    }
+
+    return hits;
   }
 }

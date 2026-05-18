@@ -15,7 +15,7 @@ export type Result<T, E = MensuraError> =
 
 export interface ErrorInput {
   readonly code: string;
-  message: string;
+  readonly message: string;
   readonly stage: string;
   readonly retryable?: boolean;
   readonly cause?: unknown;
@@ -41,5 +41,5 @@ export function unwrap<T, E extends MensuraError = MensuraError>(r: Result<T, E>
   }
 
   const reason = `${r.error.stage}/${r.error.code}: ${r.error.message}`;
-  throw new Error(hint ? `${hint} — ${reason}` : reason);
+  throw new Error(hint ? `${hint}: ${reason}` : reason);
 }

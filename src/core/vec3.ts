@@ -157,13 +157,16 @@ export function normalize3(value: Vec3): Vec3 {
 }
 
 export function normalize3Into(value: Vec3, out: MutableVec3): MutableVec3 {
-  const lenSq = lengthSq3(value);
+  const x = value.x;
+  const y = value.y;
+  const z = value.z;
+  const lenSq = x * x + y * y + z * z;
 
   if (lenSq > 0) {
     const invLen = 1 / Math.sqrt(lenSq);
-    out.x = value.x * invLen;
-    out.y = value.y * invLen;
-    out.z = value.z * invLen;
+    out.x = x * invLen;
+    out.y = y * invLen;
+    out.z = z * invLen;
     return out;
   }
 

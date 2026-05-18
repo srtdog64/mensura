@@ -4,6 +4,7 @@ import type { Ray } from "../geometry/ray.js";
 import { rayIntersectsAabb } from "../geometry/ray.js";
 import type { Result } from "../core/result.js";
 import { ok, err } from "../core/result.js";
+import type { AccelContext } from "./context.js";
 
 export interface BvhNode {
   aabb: Aabb;
@@ -16,6 +17,7 @@ export interface BvhNode {
 export interface Bvh {
   root: BvhNode | null;
 }
+
 
 export function buildBvh(primitives: Aabb[], maxPrimitivesPerLeaf: number = 4): Result<Bvh> {
   if (primitives.length === 0) {
@@ -57,16 +59,17 @@ function buildBvhNode(primitives: Aabb[], indices: number[], maxPrimitivesPerLea
   const extentX = bounds.max.x - bounds.min.x;
   const extentY = bounds.max.y - bounds.min.y;
   const extentZ = bounds.max.z - bounds.min.z;
-  
-  let axis = 0;
-  if (extentY > extentX && extentY > extentZ) axis = 1;
-  else if (extentZ > extentX && extentZ > extentY) axis = 2;
 
-  indices.sort((a, b) => {
-    const centerA = (primitives[a].min[axis === 0 ? 'x' : axis === 1 ? 'y' : 'z'] + primitives[a].max[axis === 0 ? 'x' : axis === 1 ? 'y' : 'z']) * 0.5;
-    const centerB = (primitives[b].min[axis === 0 ? 'x' : axis === 1 ? 'y' : 'z'] + primitives[b].max[axis === 0 ? 'x' : axis === 1 ? 'y' : 'z']) * 0.5;
-    return centerA - centerB;
-  });
+  let compare: (a: number, b: number) => number;
+  if (extentY > extentX && extentY > extentZ) {
+    compare = (a, b) => (primitives[a].min.y + primitives[a].max.y) - (primitives[b].min.y + primitives[b].max.y);
+  } else if (extentZ > extentX && extentZ > extentY) {
+    compare = (a, b) => (primitives[a].min.z + primitives[a].max.z) - (primitives[b].min.z + primitives[b].max.z);
+  } else {
+    compare = (a, b) => (primitives[a].min.x + primitives[a].max.x) - (primitives[b].min.x + primitives[b].max.x);
+  }
+
+  indices.sort(compare);
 
   const mid = Math.floor(indices.length / 2);
   const leftIndices = indices.slice(0, mid);
@@ -80,16 +83,22 @@ function buildBvhNode(primitives: Aabb[], indices: number[], maxPrimitivesPerLea
   };
 }
 
-export function bvhRaycast(bvh: Bvh, ray: Ray): number[] {
+export function bvhRaycast(bvh: Bvh, ray: Ray, ctx: AccelContext): number[] {
   const result: number[] = [];
   if (!bvh.root) return result;
 
-  const stack: BvhNode[] = [bvh.root];
+  const stack = ctx.bvhStack;
+  stack.length = 0;
+  stack.push(bvh.root);
+
   while (stack.length > 0) {
     const node = stack.pop()!;
     if (rayIntersectsAabb(ray, node.aabb)) {
       if (node.isLeaf && node.primitiveIndices) {
-        result.push(...node.primitiveIndices);
+        const leaf = node.primitiveIndices;
+        for (let i = 0; i < leaf.length; i++) {
+          result.push(leaf[i]);
+        }
       } else {
         if (node.left) stack.push(node.left);
         if (node.right) stack.push(node.right);

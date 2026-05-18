@@ -252,6 +252,29 @@ export function mat4TransformPoint3Into(matrix: Mat4Like, point: Vec3, out: Muta
   return out;
 }
 
+export function mat4TransformAffinePoint3(matrix: Mat4Like, point: Vec3): Vec3 {
+  const x = point.x;
+  const y = point.y;
+  const z = point.z;
+
+  return {
+    x: matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
+    y: matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
+    z: matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]
+  };
+}
+
+export function mat4TransformAffinePoint3Into(matrix: Mat4Like, point: Vec3, out: MutableVec3): MutableVec3 {
+  const x = point.x;
+  const y = point.y;
+  const z = point.z;
+
+  out.x = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+  out.y = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+  out.z = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+  return out;
+}
+
 export function mat4TransformDirection3(matrix: Mat4Like, direction: Vec3): Vec3 {
   return mat4TransformDirection3Into(matrix, direction, mutableVec3());
 }

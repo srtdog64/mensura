@@ -9,14 +9,20 @@ guessing at conventions.
 
 ```txt
 core      semantic number math: float, vectors, matrices, quaternions, Result
-geometry  spatial primitives and intersection/culling semantics
+geometry  spatial primitive definitions and primitive-local operations
+query     spatial queries: ray hits, overlap tests, frustum culling
+collision narrowphase collision algorithms: SAT, GJK, EPA
+accel     acceleration structures and broadphase traversal
+world     orchestration over collision bodies and acceleration structures
+layout    WGSL-compatible byte layout metadata
+data      checked DataView projection records with Result failures
 gpu       named WebGPU projection helpers and Float32Array transport
 unsafe    unchecked binary/typed-array projection for generated or hot code
-physics   source experiment only; not part of the public package surface
+physics   compatibility facade for accel/collision/world
 ```
 
-The root package facade exports `core`, `geometry`, and `gpu`. It does not
-export `unsafe`; callers must import `@exornea/mensura/unsafe` explicitly.
+The root package facade exports the primary safe layers. It does not export
+`unsafe`; callers must import `@exornea/mensura/unsafe` explicitly.
 
 ## Safe API Contract
 
@@ -46,9 +52,10 @@ uniform/storage writes, and Zeno-style binary projections.
 ## Near-Term Gates
 
 - Keep `npm run check` green before expanding the public export surface.
-- Do not export `physics` until it compiles under strict mode and has witness
-  tests for GJK/EPA/BVH behavior.
-- Add `data` or `layout` only when there is a safe, checked counterpart to an
-  existing `unsafe` projection.
-- Migrate matrix inverse/look-at/projection validation from `throw` to `Result`
-  before treating them as compiler-targetable APIs.
+- Keep `physics` as a compatibility facade. New collision work should land in
+  `collision`, `accel`, `query`, or `world` according to responsibility.
+- Keep `layout` as metadata and `data` as the checked projection boundary.
+  Generated code can drop to `unsafe` only after it owns the same layout
+  contract explicitly.
+- Keep matrix inverse/look-at/projection validation `Result`-first before
+  treating them as compiler-targetable APIs.

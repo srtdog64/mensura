@@ -1,4 +1,5 @@
 import { type MutableMat4, mat4Identity } from "../core/mat4.js";
+import { PERSPECTIVE_MAX_FOV_Y_RADIANS, PERSPECTIVE_MIN_FOV_Y_RADIANS } from "../core/policy.js";
 import { type Result, err, mensuraError, ok } from "../core/result.js";
 
 export function mat4PerspectiveWebGpuRh(
@@ -109,12 +110,12 @@ function validatePerspectiveArgs(
   near: number,
   far: number
 ): Result<undefined> {
-  if (!(fovYRadians > 0 && fovYRadians < Math.PI)) {
+  if (!(fovYRadians > PERSPECTIVE_MIN_FOV_Y_RADIANS && fovYRadians < PERSPECTIVE_MAX_FOV_Y_RADIANS)) {
     return err(mensuraError({
       code: "VALIDATION_INVALID_FORMAT",
       stage: "ValidateInput",
       message: "fovYRadians must be greater than 0 and less than PI.",
-      meta: { fovYRadians }
+      meta: { fovYRadians, min: PERSPECTIVE_MIN_FOV_Y_RADIANS, max: PERSPECTIVE_MAX_FOV_Y_RADIANS }
     }));
   }
 

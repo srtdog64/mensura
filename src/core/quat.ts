@@ -2,10 +2,10 @@ import type { Vec4, MutableVec4 } from "./vec4.js";
 import { vec4, mutableVec4, copy4, copy4Into, length4, dot4 } from "./vec4.js";
 import type { Mat3Like } from "./mat3.js";
 import type { Vec3 } from "./vec3.js";
+import { QUAT_PARALLEL_EPSILON, QUAT_SLERP_LINEAR_THRESHOLD } from "./policy.js";
 import { type Result, err, mensuraError, ok } from "./result.js";
 
-export const QUAT_SLERP_LINEAR_THRESHOLD = 0.9995;
-const QUAT_PARALLEL_EPSILON = 1e-8;
+export { QUAT_PARALLEL_EPSILON, QUAT_SLERP_LINEAR_THRESHOLD } from "./policy.js";
 
 export type Quat = Vec4;
 export type MutableQuat = MutableVec4;

@@ -30,10 +30,22 @@ export function vec3ReadFloat32(buffer: ArrayLike<number>, offset: number = 0): 
 }
 
 export function mat4WriteFloat32(value: Mat4Like, buffer: Float32Array, offset: number = 0): Float32Array {
-  for (let index = 0; index < 16; index += 1) {
-    buffer[offset + index] = value[index];
-  }
-
+  buffer[offset + 0] = value[0];
+  buffer[offset + 1] = value[1];
+  buffer[offset + 2] = value[2];
+  buffer[offset + 3] = value[3];
+  buffer[offset + 4] = value[4];
+  buffer[offset + 5] = value[5];
+  buffer[offset + 6] = value[6];
+  buffer[offset + 7] = value[7];
+  buffer[offset + 8] = value[8];
+  buffer[offset + 9] = value[9];
+  buffer[offset + 10] = value[10];
+  buffer[offset + 11] = value[11];
+  buffer[offset + 12] = value[12];
+  buffer[offset + 13] = value[13];
+  buffer[offset + 14] = value[14];
+  buffer[offset + 15] = value[15];
   return buffer;
 }
 

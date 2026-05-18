@@ -15,6 +15,8 @@ Mensura owns reusable math primitives:
 - vectors, quaternions, and matrices
 - rays, planes, AABBs, spheres, and frustums
 - intersection and overlap tests
+- collision narrowphase and acceleration structures
+- WGSL layout metadata and checked DataView projection
 - grid/world coordinate conversion
 - transform compose/decompose helpers
 
@@ -52,13 +54,53 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 ```txt
 @exornea/mensura           facade for the whole kernel
 @exornea/mensura/core      float, vector, and matrix math
-@exornea/mensura/geometry  rays, planes, bounds, spheres, and frustums
+@exornea/mensura/geometry  shape primitives: rays, planes, bounds, spheres
+@exornea/mensura/query     ray hits, overlap tests, frustum culling
+@exornea/mensura/collision SAT, GJK, and EPA narrowphase
+@exornea/mensura/accel     BVH and broadphase acceleration structures
+@exornea/mensura/world     collision world orchestration
+@exornea/mensura/layout    WGSL-compatible byte layout metadata
+@exornea/mensura/data      checked DataView projection records
+@exornea/mensura/physics   compatibility facade for accel/collision/world
 @exornea/mensura/gpu       WebGPU projection and packed Float32Array bridges
 @exornea/mensura/unsafe    unchecked binary and typed-array projection helpers
 ```
 
+The root facade exports the primary layers. `physics` remains as a compatibility
+facade for older imports, but new code should import `query`, `collision`,
+`accel`, and `world` by responsibility. `layout` describes byte-level records;
+`data` is the checked `Result`-first bridge from semantic values into those
+records.
+
 `unsafe` is intentionally not re-exported by the root facade. Import it by name
 when a caller owns the buffer layout, bounds checks, and aliasing contract.
+
+## Failure Model
+
+Operations that can fail at the boundary return `Result<T>` data rather than
+throwing. The shape is:
+
+```ts
+type Result<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: MensuraError };
+```
+
+Common error codes: `VALIDATION_INVALID_FORMAT` (bad perspective arguments),
+`TRANSFORM_SINGULAR` (`det = 0` inversion), `TRANSFORM_DEGENERATE_BASIS`
+(`lookAt` with `eye = center`, `quatFromUnitVectors` anti-parallel without a
+stable axis).
+
+Use `unwrap(result)` for call sites that should fail fast, or `result.ok`
+discrimination for callers that need to handle the error.
+
+## Policy
+
+Numerical thresholds and validation bounds are collected in `DEFAULT_POLICY`
+so that decisions are visible as data, not magic constants. Individual
+constants (`QUAT_SLERP_LINEAR_THRESHOLD`, `QUAT_PARALLEL_EPSILON`,
+`PERSPECTIVE_MIN_FOV_Y_RADIANS`, `PERSPECTIVE_MAX_FOV_Y_RADIANS`,
+`DEFAULT_FLOAT_TOLERANCE`) are also exported for direct reference.
 
 ## First API
 
@@ -68,20 +110,20 @@ import {
   lossF32,
   nearlyEqualUlpsF32,
   ulpDiffF32,
+  unwrap,
   vec3
 } from "@exornea/mensura/core";
 import {
   aabb,
   frustumFromMatrixWebGpu,
-  frustumIntersectsAabb,
   ray,
-  rayAabbHitDistance
 } from "@exornea/mensura/geometry";
+import { frustumIntersectsAabb, rayAabbHitDistance } from "@exornea/mensura/query";
 import { mat4PerspectiveWebGpuRh } from "@exornea/mensura/gpu";
 
 const a = vec3(0, 0, 0);
 const b = vec3(1, 2, 3);
-const projection = mat4PerspectiveWebGpuRh(Math.PI / 2, 16 / 9, 0.1, 100);
+const projection = unwrap(mat4PerspectiveWebGpuRh(Math.PI / 2, 16 / 9, 0.1, 100));
 const frustum = frustumFromMatrixWebGpu(projection);
 const bounds = aabb(vec3(-1, -1, -5), vec3(1, 1, -3));
 const pickRay = ray(vec3(0, 0, 0), vec3(0, 0, -1));
@@ -94,13 +136,16 @@ console.log(frustumIntersectsAabb(frustum, bounds));
 console.log(rayAabbHitDistance(pickRay, bounds));
 ```
 
+Worked examples (camera+frustum, TRS compose/decompose, quaternion operations,
+Result-based error handling) live under [examples/](examples/).
+
 ## Non-Goals
 
 - no renderer handles
 - no scene graph
 - no entity/component model
 - no asset or material catalog
-- no physics engine
+- no full physics engine, solver, integrator, or rigid-body runtime
 - no editor UI state
 
 Mensura should remain a geometry kernel that Geukbit, Zeno benchmarks, and other

@@ -96,18 +96,42 @@ export function unsafeMat4ReadFloat32Into(
   offset: number,
   out: MutableMat4
 ): MutableMat4 {
-  for (let index = 0; index < MAT4_F32_LENGTH; index += 1) {
-    out[index] = buffer[offset + index];
-  }
-
+  out[0] = buffer[offset + 0];
+  out[1] = buffer[offset + 1];
+  out[2] = buffer[offset + 2];
+  out[3] = buffer[offset + 3];
+  out[4] = buffer[offset + 4];
+  out[5] = buffer[offset + 5];
+  out[6] = buffer[offset + 6];
+  out[7] = buffer[offset + 7];
+  out[8] = buffer[offset + 8];
+  out[9] = buffer[offset + 9];
+  out[10] = buffer[offset + 10];
+  out[11] = buffer[offset + 11];
+  out[12] = buffer[offset + 12];
+  out[13] = buffer[offset + 13];
+  out[14] = buffer[offset + 14];
+  out[15] = buffer[offset + 15];
   return out;
 }
 
 export function unsafeMat4WriteFloat32(value: Mat4Like, buffer: Float32Array, offset: number = 0): Float32Array {
-  for (let index = 0; index < MAT4_F32_LENGTH; index += 1) {
-    buffer[offset + index] = value[index];
-  }
-
+  buffer[offset + 0] = value[0];
+  buffer[offset + 1] = value[1];
+  buffer[offset + 2] = value[2];
+  buffer[offset + 3] = value[3];
+  buffer[offset + 4] = value[4];
+  buffer[offset + 5] = value[5];
+  buffer[offset + 6] = value[6];
+  buffer[offset + 7] = value[7];
+  buffer[offset + 8] = value[8];
+  buffer[offset + 9] = value[9];
+  buffer[offset + 10] = value[10];
+  buffer[offset + 11] = value[11];
+  buffer[offset + 12] = value[12];
+  buffer[offset + 13] = value[13];
+  buffer[offset + 14] = value[14];
+  buffer[offset + 15] = value[15];
   return buffer;
 }
 
@@ -125,10 +149,22 @@ export function unsafeMat4ReadDataViewF32Into(
   out: MutableMat4,
   littleEndian: boolean = true
 ): MutableMat4 {
-  for (let index = 0; index < MAT4_F32_LENGTH; index += 1) {
-    out[index] = view.getFloat32(byteOffset + index * F32_BYTES, littleEndian);
-  }
-
+  out[0] = view.getFloat32(byteOffset + 0, littleEndian);
+  out[1] = view.getFloat32(byteOffset + 4, littleEndian);
+  out[2] = view.getFloat32(byteOffset + 8, littleEndian);
+  out[3] = view.getFloat32(byteOffset + 12, littleEndian);
+  out[4] = view.getFloat32(byteOffset + 16, littleEndian);
+  out[5] = view.getFloat32(byteOffset + 20, littleEndian);
+  out[6] = view.getFloat32(byteOffset + 24, littleEndian);
+  out[7] = view.getFloat32(byteOffset + 28, littleEndian);
+  out[8] = view.getFloat32(byteOffset + 32, littleEndian);
+  out[9] = view.getFloat32(byteOffset + 36, littleEndian);
+  out[10] = view.getFloat32(byteOffset + 40, littleEndian);
+  out[11] = view.getFloat32(byteOffset + 44, littleEndian);
+  out[12] = view.getFloat32(byteOffset + 48, littleEndian);
+  out[13] = view.getFloat32(byteOffset + 52, littleEndian);
+  out[14] = view.getFloat32(byteOffset + 56, littleEndian);
+  out[15] = view.getFloat32(byteOffset + 60, littleEndian);
   return out;
 }
 
@@ -138,9 +174,21 @@ export function unsafeMat4WriteDataViewF32(
   byteOffset: number,
   littleEndian: boolean = true
 ): DataView {
-  for (let index = 0; index < MAT4_F32_LENGTH; index += 1) {
-    view.setFloat32(byteOffset + index * F32_BYTES, value[index], littleEndian);
-  }
-
+  view.setFloat32(byteOffset + 0, value[0], littleEndian);
+  view.setFloat32(byteOffset + 4, value[1], littleEndian);
+  view.setFloat32(byteOffset + 8, value[2], littleEndian);
+  view.setFloat32(byteOffset + 12, value[3], littleEndian);
+  view.setFloat32(byteOffset + 16, value[4], littleEndian);
+  view.setFloat32(byteOffset + 20, value[5], littleEndian);
+  view.setFloat32(byteOffset + 24, value[6], littleEndian);
+  view.setFloat32(byteOffset + 28, value[7], littleEndian);
+  view.setFloat32(byteOffset + 32, value[8], littleEndian);
+  view.setFloat32(byteOffset + 36, value[9], littleEndian);
+  view.setFloat32(byteOffset + 40, value[10], littleEndian);
+  view.setFloat32(byteOffset + 44, value[11], littleEndian);
+  view.setFloat32(byteOffset + 48, value[12], littleEndian);
+  view.setFloat32(byteOffset + 52, value[13], littleEndian);
+  view.setFloat32(byteOffset + 56, value[14], littleEndian);
+  view.setFloat32(byteOffset + 60, value[15], littleEndian);
   return view;
 }

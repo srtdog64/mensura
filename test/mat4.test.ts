@@ -9,6 +9,7 @@ import {
   mat4LookAtRh,
   mat4Multiply,
   mat4Scaling,
+  mat4TransformAffinePoint3,
   mat4TransformDirection3,
   mat4TransformPoint3,
   mat4Translation,
@@ -30,6 +31,7 @@ describe("Mat4", () => {
     const transform = mat4Multiply(translation, scaling);
 
     expect(mat4TransformPoint3(transform, vec3(1, 1, 1))).toEqual(vec3(12, 23, 34));
+    expect(mat4TransformAffinePoint3(transform, vec3(1, 1, 1))).toEqual(vec3(12, 23, 34));
     expect(mat4TransformDirection3(transform, vec3(1, 1, 1))).toEqual(vec3(2, 3, 4));
   });
 

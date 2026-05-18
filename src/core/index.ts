@@ -6,4 +6,5 @@ export * from "./mat3.js";
 export * from "./quat.js";
 export * from "./euler.js";
 export * from "./dual-quat.js";
+export * from "./policy.js";
 export * from "./result.js";

@@ -1,10 +1,13 @@
 import { performance } from "node:perf_hooks";
+import { mat4 as glMat4, vec3 as glVec3 } from "gl-matrix";
+import { mat4 as wgpuMat4, vec3 as wgpuVec3 } from "wgpu-matrix";
 import {
   add3,
   add3Into,
   mat4Identity,
   mat4Multiply,
   mat4MultiplyInto,
+  mat4TransformAffinePoint3Into,
   mat4TransformPoint3,
   mat4TransformPoint3Into,
   mutableVec3,
@@ -13,9 +16,10 @@ import {
   vec3
 } from "./dist/core/index.js";
 import { aabb, ray, rayAabbHitDistance } from "./dist/geometry/index.js";
-import { vec3WriteFloat32 } from "./dist/gpu/index.js";
+import { mat4WriteFloat32, vec3WriteFloat32 } from "./dist/gpu/index.js";
 import {
   unsafeMat4WriteDataViewF32,
+  unsafeMat4WriteFloat32,
   unsafeVec3WriteDataViewF32,
   unsafeVec3WriteFloat32
 } from "./dist/unsafe/index.js";
@@ -35,6 +39,10 @@ const vecA = Array.from({ length: 256 }, (_, index) =>
 const vecB = Array.from({ length: 256 }, (_, index) =>
   vec3(index * 0.175 + 4, index * 0.275 + 5, index * 0.475 + 6)
 );
+const glVecA = vecA.map((value) => glVec3.fromValues(value.x, value.y, value.z));
+const glVecB = vecB.map((value) => glVec3.fromValues(value.x, value.y, value.z));
+const wgpuVecA = vecA.map((value) => wgpuVec3.fromValues(value.x, value.y, value.z));
+const wgpuVecB = vecB.map((value) => wgpuVec3.fromValues(value.x, value.y, value.z));
 const matrices = Array.from({ length: 128 }, (_, index) => {
   const matrix = mat4Identity();
   matrix[0] = 1 + index * 0.001;
@@ -45,6 +53,18 @@ const matrices = Array.from({ length: 128 }, (_, index) => {
   matrix[14] = index * 0.3;
   return matrix;
 });
+const glMatrices = matrices.map((matrix) => glMat4.fromValues(
+  matrix[0], matrix[1], matrix[2], matrix[3],
+  matrix[4], matrix[5], matrix[6], matrix[7],
+  matrix[8], matrix[9], matrix[10], matrix[11],
+  matrix[12], matrix[13], matrix[14], matrix[15]
+));
+const wgpuMatrices = matrices.map((matrix) => wgpuMat4.create(
+  matrix[0], matrix[1], matrix[2], matrix[3],
+  matrix[4], matrix[5], matrix[6], matrix[7],
+  matrix[8], matrix[9], matrix[10], matrix[11],
+  matrix[12], matrix[13], matrix[14], matrix[15]
+));
 const rays = Array.from({ length: 128 }, (_, index) =>
   ray(vec3(index * 0.01, 0, 5), vec3(0, 0, -1))
 );
@@ -92,6 +112,30 @@ const cases = [
     }
   },
   {
+    group: "vec3 add",
+    name: "gl-matrix vec3.add",
+    iterations: VEC_ITERATIONS,
+    run: () => {
+      const out = glVec3.create();
+      for (let index = 0; index < VEC_ITERATIONS; index += 1) {
+        glVec3.add(out, glVecA[index & 255], glVecB[index & 255]);
+        sink += out[0];
+      }
+    }
+  },
+  {
+    group: "vec3 add",
+    name: "wgpu-matrix vec3.add",
+    iterations: VEC_ITERATIONS,
+    run: () => {
+      const out = wgpuVec3.create();
+      for (let index = 0; index < VEC_ITERATIONS; index += 1) {
+        wgpuVec3.add(wgpuVecA[index & 255], wgpuVecB[index & 255], out);
+        sink += out[0];
+      }
+    }
+  },
+  {
     group: "vec3 normalize",
     name: "naive object baseline",
     iterations: VEC_ITERATIONS,
@@ -129,6 +173,30 @@ const cases = [
     }
   },
   {
+    group: "vec3 normalize",
+    name: "gl-matrix vec3.normalize",
+    iterations: VEC_ITERATIONS,
+    run: () => {
+      const out = glVec3.create();
+      for (let index = 0; index < VEC_ITERATIONS; index += 1) {
+        glVec3.normalize(out, glVecA[index & 255]);
+        sink += out[1];
+      }
+    }
+  },
+  {
+    group: "vec3 normalize",
+    name: "wgpu-matrix vec3.normalize",
+    iterations: VEC_ITERATIONS,
+    run: () => {
+      const out = wgpuVec3.create();
+      for (let index = 0; index < VEC_ITERATIONS; index += 1) {
+        wgpuVec3.normalize(wgpuVecA[index & 255], out);
+        sink += out[1];
+      }
+    }
+  },
+  {
     group: "mat4 multiply",
     name: "Mensura mat4Multiply",
     iterations: MAT_ITERATIONS,
@@ -147,6 +215,30 @@ const cases = [
       const out = mat4Identity();
       for (let index = 0; index < MAT_ITERATIONS; index += 1) {
         mat4MultiplyInto(matrices[index & 127], matrices[(index + 1) & 127], out);
+        sink += out[12];
+      }
+    }
+  },
+  {
+    group: "mat4 multiply",
+    name: "gl-matrix mat4.multiply",
+    iterations: MAT_ITERATIONS,
+    run: () => {
+      const out = glMat4.create();
+      for (let index = 0; index < MAT_ITERATIONS; index += 1) {
+        glMat4.multiply(out, glMatrices[index & 127], glMatrices[(index + 1) & 127]);
+        sink += out[12];
+      }
+    }
+  },
+  {
+    group: "mat4 multiply",
+    name: "wgpu-matrix mat4.multiply",
+    iterations: MAT_ITERATIONS,
+    run: () => {
+      const out = wgpuMat4.create();
+      for (let index = 0; index < MAT_ITERATIONS; index += 1) {
+        wgpuMat4.multiply(wgpuMatrices[index & 127], wgpuMatrices[(index + 1) & 127], out);
         sink += out[12];
       }
     }
@@ -171,6 +263,42 @@ const cases = [
       for (let index = 0; index < MAT_ITERATIONS; index += 1) {
         mat4TransformPoint3Into(matrices[index & 127], vecA[index & 255], out);
         sink += out.z;
+      }
+    }
+  },
+  {
+    group: "mat4 transform",
+    name: "Mensura affinePoint3Into",
+    iterations: MAT_ITERATIONS,
+    run: () => {
+      const out = mutableVec3();
+      for (let index = 0; index < MAT_ITERATIONS; index += 1) {
+        mat4TransformAffinePoint3Into(matrices[index & 127], vecA[index & 255], out);
+        sink += out.z;
+      }
+    }
+  },
+  {
+    group: "mat4 transform",
+    name: "gl-matrix vec3.transformMat4",
+    iterations: MAT_ITERATIONS,
+    run: () => {
+      const out = glVec3.create();
+      for (let index = 0; index < MAT_ITERATIONS; index += 1) {
+        glVec3.transformMat4(out, glVecA[index & 255], glMatrices[index & 127]);
+        sink += out[2];
+      }
+    }
+  },
+  {
+    group: "mat4 transform",
+    name: "wgpu-matrix vec3.transformMat4",
+    iterations: MAT_ITERATIONS,
+    run: () => {
+      const out = wgpuVec3.create();
+      for (let index = 0; index < MAT_ITERATIONS; index += 1) {
+        wgpuVec3.transformMat4(wgpuVecA[index & 255], wgpuMatrices[index & 127], out);
+        sink += out[2];
       }
     }
   },
@@ -214,6 +342,28 @@ const cases = [
       for (let index = 0; index < WRITE_ITERATIONS; index += 1) {
         unsafeVec3WriteDataViewF32(vecA[index & 255], dataView, 16);
         sink += dataView.getFloat32(16, true);
+      }
+    }
+  },
+  {
+    group: "f32 write",
+    name: "gpu mat4WriteFloat32",
+    iterations: WRITE_ITERATIONS,
+    run: () => {
+      for (let index = 0; index < WRITE_ITERATIONS; index += 1) {
+        mat4WriteFloat32(matrices[index & 127], packed, 16);
+        sink += packed[16];
+      }
+    }
+  },
+  {
+    group: "f32 write",
+    name: "unsafeMat4WriteFloat32",
+    iterations: WRITE_ITERATIONS,
+    run: () => {
+      for (let index = 0; index < WRITE_ITERATIONS; index += 1) {
+        unsafeMat4WriteFloat32(matrices[index & 127], packed, 16);
+        sink += packed[16];
       }
     }
   },
