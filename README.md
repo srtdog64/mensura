@@ -61,25 +61,28 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/world     collision world orchestration
 @exornea/mensura/layout    WGSL-compatible byte layout metadata
 @exornea/mensura/data      checked DataView projection records
+@exornea/mensura/measure   closest points, bounds, areas, barycentric data
 @exornea/mensura/batch     object-array batch kernels for hot loops
 @exornea/mensura/physics   compatibility facade for accel/collision/world
 @exornea/mensura/gpu       WebGPU projection and packed Float32Array bridges
 @exornea/mensura/unsafe    unchecked binary and typed-array projection helpers
 ```
 
-For `0.1.x`, `core`, `geometry`, `query`, `gpu`, `layout`, `data`, and
-`batch` are the stable release surface. `collision`, `accel`, and `world` are
-experimental dogfood layers. `physics` is a compatibility facade. `unsafe` is
-explicitly unsafe and opt-in.
+For `0.1.x`, `core`, `geometry`, `query`, `measure`, `gpu`, `layout`, `data`,
+and `batch` are the stable release surface. `collision`, `accel`, and `world`
+are experimental dogfood layers. `physics` is a compatibility facade. `unsafe`
+is explicitly unsafe and opt-in.
 
 See [API Stability](docs/api-stability.md) for the release contract.
 
 The root facade exports the primary layers. `physics` remains as a compatibility
 facade for older imports, but new code should import `query`, `collision`,
-`accel`, and `world` by responsibility. `layout` describes byte-level records;
-`data` is the checked `Result`-first bridge from semantic values into those
-records. `batch` keeps the inspectable object policy while amortizing call
-overhead across many values.
+`accel`, and `world` by responsibility. `measure` owns derived primitive
+measurements and projections such as AABB closest points, capsule bounds,
+triangle normals, areas, barycentric coordinates, and triangle closest points.
+`layout` describes byte-level records; `data` is the checked `Result`-first
+bridge from semantic values into those records. `batch` keeps the inspectable
+object policy while amortizing call overhead across many values.
 
 `unsafe` is intentionally not re-exported by the root facade. Import it by name
 when a caller owns the buffer layout, bounds checks, and aliasing contract.

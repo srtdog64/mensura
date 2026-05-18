@@ -1,12 +1,12 @@
 export {
-  aabbClosestPoint,
-  aabbClosestPointInto,
   aabbContainsPoint,
-  aabbDistanceSqToPoint,
-  aabbExpandByPoint,
-  aabbExpandByPointInto,
-  aabbIntersectsAabb
+  aabbIntersectsAabb,
+  aabbIsEmpty
 } from "../geometry/aabb.js";
+export {
+  capsuleContainsPoint,
+  capsuleIntersectsSphere
+} from "../geometry/capsule.js";
 export {
   frustumContainsPoint,
   frustumFromMatrixWebGpu,

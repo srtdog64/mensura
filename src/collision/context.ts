@@ -19,7 +19,10 @@ export class CollisionContext {
   public gjkCross1: MutableVec3 = mutableVec3();
   public gjkCross2: MutableVec3 = mutableVec3();
   public gjkNegDir: MutableVec3 = mutableVec3();
-  
+  public gjkInitialD: MutableVec3 = mutableVec3();
+  public gjkD: MutableVec3 = mutableVec3();
+  public gjkSimplex: MutableVec3[] = [mutableVec3(), mutableVec3(), mutableVec3(), mutableVec3()];
+
   // EPA scratchpad
   public epaNorm: MutableVec3 = mutableVec3();
   public epaEdge: MutableVec3 = mutableVec3();

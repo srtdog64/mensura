@@ -11,6 +11,7 @@ guessing at conventions.
 core      semantic number math: float, vectors, matrices, quaternions, Result
 geometry  spatial primitive definitions and primitive-local operations
 query     spatial queries: ray hits, overlap tests, frustum culling
+measure   derived primitive measurements, bounds, and closest-point projections
 collision narrowphase collision algorithms: SAT, GJK, EPA
 accel     acceleration structures and broadphase traversal
 world     orchestration over collision bodies and acceleration structures

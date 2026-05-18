@@ -21,6 +21,7 @@ These layers are the primary public surface for `0.1.x`:
 | `@exornea/mensura/core` | Stable 0.1 | Float policy, `Result`, vec3/vec4, mat3/mat4, quat, euler, dual-quat. |
 | `@exornea/mensura/geometry` | Stable 0.1 | Shape construction and primitive geometry values. |
 | `@exornea/mensura/query` | Stable 0.1 | Ray hits, overlap tests, and frustum culling helpers. |
+| `@exornea/mensura/measure` | Stable 0.1 | Derived primitive measurements and projections such as AABB closest point, capsule bounds, triangle area, normal, barycentric coordinates, and closest point. |
 | `@exornea/mensura/gpu` | Stable 0.1 | WebGPU projection helpers and checked Float32Array bridges. |
 | `@exornea/mensura/layout` | Stable 0.1 | WGSL-compatible layout constants and byte offsets. |
 | `@exornea/mensura/data` | Stable 0.1 | Checked `Result`-first DataView projection layer. |
@@ -35,7 +36,7 @@ These layers are public enough to dogfood, but not yet stable enough to freeze:
 
 | Subpath | Status | Reason |
 |---|---|---|
-| `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA need more witness tests for containment, touching, degeneracy, and convergence limits. |
+| `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA witnesses for rotated overlap, separation, touching, containment, `GJK_MAX_ITERATIONS`, and EPA penetration recovery are now in place. `GjkResult` exposes `simplex` and `simplexSize` as a context-owned view; `epa(simplex, simplexSize, ...)` takes the explicit size. Remaining: more randomized OBB pairs and a deterministic EPA non-convergence witness. |
 | `@exornea/mensura/accel` | Experimental | BVH behavior is tested, but builder policy and traversal result contracts may still change. |
 | `@exornea/mensura/world` | Experimental | Useful orchestration layer, but body lifecycle and broadphase ownership are not finalized. |
 | `@exornea/mensura/physics` | Compatibility | Re-export facade for older imports. Do not add new primary APIs here. |

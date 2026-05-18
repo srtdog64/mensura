@@ -1,5 +1,5 @@
 import type { Vec3 } from "../core/vec3.js";
-import { dot3, lengthSq3, mutableVec3, sub3Into, scale3Into, cross3Into, copy3Into } from "../core/vec3.js";
+import { dot3, lengthSq3, sub3Into, scale3Into, cross3Into, copy3Into } from "../core/vec3.js";
 import type { MutableVec3 } from "../core/vec3.js";
 import type { Result } from "../core/result.js";
 import { ok, err } from "../core/result.js";
@@ -8,8 +8,28 @@ import type { CollisionContext } from "./context.js";
 export type SupportFunction = (direction: Vec3) => Vec3;
 
 export interface GjkResult {
+  /** True when the Minkowski difference contains the origin. */
   intersect: boolean;
-  simplex: Vec3[];
+  /**
+   * View into `ctx.gjkSimplex`. Valid until the next `gjk()` call on the same
+   * context. Copy with `copy3Into` if the caller needs to retain the points.
+   */
+  simplex: readonly MutableVec3[];
+  /** Number of meaningful entries in `simplex` (1..4). */
+  simplexSize: number;
+}
+
+function gjkSupportInto(
+  supportA: SupportFunction,
+  supportB: SupportFunction,
+  ctx: CollisionContext,
+  dir: Vec3,
+  out: MutableVec3
+): MutableVec3 {
+  scale3Into(dir, -1, ctx.gjkNegDir);
+  const sA = supportA(dir);
+  const sB = supportB(ctx.gjkNegDir);
+  return sub3Into(sA, sB, out);
 }
 
 export function gjk(
@@ -18,34 +38,34 @@ export function gjk(
   ctx: CollisionContext,
   maxIterations: number = 64
 ): Result<GjkResult> {
-  const support = (dir: Vec3, out: MutableVec3) => {
-    scale3Into(dir, -1, ctx.gjkNegDir);
-    const sA = supportA(dir);
-    const sB = supportB(ctx.gjkNegDir);
-    return sub3Into(sA, sB, out);
-  };
+  const simplex = ctx.gjkSimplex;
+  const d = ctx.gjkD;
+  const initialD = ctx.gjkInitialD;
 
-  const initialD = mutableVec3(1, 0, 0);
-  const simplex: MutableVec3[] = [mutableVec3(), mutableVec3(), mutableVec3(), mutableVec3()];
-  
-  support(initialD, simplex[0]);
+  initialD.x = 1;
+  initialD.y = 0;
+  initialD.z = 0;
+
+  gjkSupportInto(supportA, supportB, ctx, initialD, simplex[0]);
   let simplexSize = 1;
 
-  const d = mutableVec3(-simplex[0].x, -simplex[0].y, -simplex[0].z);
+  d.x = -simplex[0].x;
+  d.y = -simplex[0].y;
+  d.z = -simplex[0].z;
 
   for (let i = 0; i < maxIterations; i++) {
-    support(d, simplex[simplexSize]);
+    gjkSupportInto(supportA, supportB, ctx, d, simplex[simplexSize]);
     const a = simplex[simplexSize];
 
     if (dot3(a, d) <= 0) {
-      return ok({ intersect: false, simplex: simplex.slice(0, simplexSize) });
+      return ok({ intersect: false, simplex, simplexSize });
     }
 
     simplexSize++;
 
     const newSize = handleSimplex(simplex, d, simplexSize, ctx);
     if (newSize === 0) {
-      return ok({ intersect: true, simplex: simplex.slice(0, simplexSize) });
+      return ok({ intersect: true, simplex, simplexSize });
     }
     simplexSize = newSize;
   }

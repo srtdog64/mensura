@@ -76,6 +76,14 @@
       "types": "./dist/data/*.d.ts",
       "default": "./dist/data/*.js"
     },
+    "./measure": {
+      "types": "./dist/measure/index.d.ts",
+      "default": "./dist/measure/index.js"
+    },
+    "./measure/*": {
+      "types": "./dist/measure/*.d.ts",
+      "default": "./dist/measure/*.js"
+    },
     "./batch": {
       "types": "./dist/batch/index.d.ts",
       "default": "./dist/batch/index.js"

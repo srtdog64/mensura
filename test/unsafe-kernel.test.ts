@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  unsafeAabbExpandByPointF32Many,
   unsafeMat4MultiplyF32Many,
   unsafeMat4TransformAffinePoint3F32Many,
   unsafeMat4TransformDirection3F32Many,
@@ -12,6 +13,8 @@ import {
   unsafeVec3DistanceF32Many,
   unsafeVec3DotF32Many,
   unsafeVec3LengthF32Many,
+  unsafeVec3MaxF32Many,
+  unsafeVec3MinF32Many,
   unsafeVec3NormalizeF32Many,
   unsafeVec3ScaleF32,
   unsafeVec3ScaleAndAddF32Many,
@@ -201,5 +204,62 @@ describe("unsafe Float32Array kernels", () => {
     const alias = new Float32Array([...translation]);
     unsafeMat4MultiplyF32Many(alias, new Float32Array(scale), alias, 1);
     expect([...alias]).toEqual([...out.slice(0, 16)]);
+  });
+
+  it("runs packed vec3 min/max kernels with count-limited writes", () => {
+    const a = new Float32Array([1, 5, 3, 4, 2, 6, 999, 999, 999]);
+    const b = new Float32Array([2, 1, 4, 3, 6, 5, 999, 999, 999]);
+    const minOut = new Float32Array(9);
+    const maxOut = new Float32Array(9);
+
+    minOut[6] = 7;
+    minOut[7] = 7;
+    minOut[8] = 7;
+    maxOut[6] = 7;
+    maxOut[7] = 7;
+    maxOut[8] = 7;
+
+    unsafeVec3MinF32Many(a, b, minOut, 2);
+    unsafeVec3MaxF32Many(a, b, maxOut, 2);
+
+    expect([...minOut.slice(0, 6)]).toEqual([1, 1, 3, 3, 2, 5]);
+    expect([...maxOut.slice(0, 6)]).toEqual([2, 5, 4, 4, 6, 6]);
+    // Slot beyond count must remain untouched.
+    expect(minOut[8]).toBe(7);
+    expect(maxOut[8]).toBe(7);
+  });
+
+  it("grows a packed AABB through unsafeAabbExpandByPointF32Many", () => {
+    const box = new Float32Array([
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY
+    ]);
+    const points = new Float32Array([
+      1, 2, 3,
+      -2, 5, 1,
+      4, -1, 0
+    ]);
+
+    unsafeAabbExpandByPointF32Many(box, 0, points, 3);
+
+    expect([...box.slice(0, 3)]).toEqual([-2, -1, 0]);
+    expect([...box.slice(3, 6)]).toEqual([4, 5, 3]);
+  });
+
+  it("appends to an existing AABB without resetting it", () => {
+    const box = new Float32Array([0, 0, 0, 1, 1, 1]);
+    const points = new Float32Array([
+      2, -1, 0.5,
+      -3, 0, 4
+    ]);
+
+    unsafeAabbExpandByPointF32Many(box, 0, points, 2);
+
+    expect([...box.slice(0, 3)]).toEqual([-3, -1, 0]);
+    expect([...box.slice(3, 6)]).toEqual([2, 1, 4]);
   });
 });

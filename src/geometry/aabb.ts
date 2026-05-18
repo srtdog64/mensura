@@ -1,5 +1,7 @@
 import type { MutableVec3, Vec3 } from "../core/vec3.js";
 import { clamp3Into, mutableVec3 } from "../core/vec3.js";
+import type { MutableSphere } from "./sphere.js";
+import { mutableSphere } from "./sphere.js";
 
 export interface Aabb {
   readonly min: Vec3;
@@ -88,4 +90,56 @@ export function aabbDistanceSqToPoint(box: Aabb, point: Vec3): number {
   const dy = py < box.min.y ? box.min.y - py : py > box.max.y ? py - box.max.y : 0;
   const dz = pz < box.min.z ? box.min.z - pz : pz > box.max.z ? pz - box.max.z : 0;
   return dx * dx + dy * dy + dz * dz;
+}
+
+/**
+ * Return an empty AABB (min = +Infinity, max = -Infinity). Combine with
+ * `aabbExpandByPointInto` to grow a bounding box from a point sequence.
+ */
+export function aabbEmpty(): MutableAabb {
+  return mutableAabb();
+}
+
+export function aabbEmptyInto(out: MutableAabb): MutableAabb {
+  out.min.x = Number.POSITIVE_INFINITY;
+  out.min.y = Number.POSITIVE_INFINITY;
+  out.min.z = Number.POSITIVE_INFINITY;
+  out.max.x = Number.NEGATIVE_INFINITY;
+  out.max.y = Number.NEGATIVE_INFINITY;
+  out.max.z = Number.NEGATIVE_INFINITY;
+  return out;
+}
+
+/**
+ * Empty when any component min exceeds the matching max. After `aabbEmpty()`
+ * all three components are inverted.
+ */
+export function aabbIsEmpty(box: Aabb): boolean {
+  return box.min.x > box.max.x || box.min.y > box.max.y || box.min.z > box.max.z;
+}
+
+export function aabbGetBoundingSphere(box: Aabb): MutableSphere {
+  return aabbGetBoundingSphereInto(box, mutableSphere());
+}
+
+export function aabbGetBoundingSphereInto(box: Aabb, out: MutableSphere): MutableSphere {
+  if (aabbIsEmpty(box)) {
+    out.center.x = 0;
+    out.center.y = 0;
+    out.center.z = 0;
+    out.radius = -1;
+    return out;
+  }
+
+  const cx = (box.min.x + box.max.x) * 0.5;
+  const cy = (box.min.y + box.max.y) * 0.5;
+  const cz = (box.min.z + box.max.z) * 0.5;
+  const hx = (box.max.x - box.min.x) * 0.5;
+  const hy = (box.max.y - box.min.y) * 0.5;
+  const hz = (box.max.z - box.min.z) * 0.5;
+  out.center.x = cx;
+  out.center.y = cy;
+  out.center.z = cz;
+  out.radius = Math.sqrt(hx * hx + hy * hy + hz * hz);
+  return out;
 }

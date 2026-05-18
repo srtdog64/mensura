@@ -37,37 +37,38 @@ Already in place:
 
 Collision is the least mature public area. Before calling it public-ready:
 
-- SAT:
-  - rotated OBB vs OBB overlap.
-  - separated rotated OBBs.
-  - touching boundary case.
-  - near-parallel axes case.
-- GJK:
-  - sphere-like support hit and miss are covered; add box support hit/miss.
-  - containment case.
-  - touching case.
-  - max-iteration failure witness with a deliberately bad support function.
-- EPA:
-  - degenerate simplex is covered.
-  - add a simple successful penetration-depth witness.
-  - add a non-converging/max-iteration witness if deterministic.
+- SAT: rotated OBB overlap, separation, touching boundary, near-parallel axes
+  are now covered in `test/physics.test.ts`.
+- GJK: sphere support hit/miss, box support hit/miss, containment, touching
+  boundary classification, and a `GJK_MAX_ITERATIONS` Result witness are
+  covered.
+- EPA: degenerate simplex Result is covered, plus a successful penetration
+  recovery witness from a real GJK simplex.
+- GJK hot path no longer allocates per call: `CollisionContext` now owns the
+  simplex pool, the initial direction, and the working direction. `GjkResult`
+  exposes `simplex` and `simplexSize` as a view into the context (valid until
+  the next `gjk` call). `epa(simplex, simplexSize, ...)` takes the explicit
+  size so it never slices.
+- Remaining: a deterministic non-converging EPA witness; a wider sweep over
+  randomized OBB pairs.
 
 ## P2: Geometry Breadth
 
-- Add `aabbEmpty()` and `aabbIsEmpty()`.
-- Add `aabbGetBoundingSphere` / `aabbGetBoundingSphereInto`.
-- Add triangle primitive helpers:
-  - normal.
-  - area.
-  - closest point.
-  - barycentric coordinate helper.
-- Add capsule query coverage:
-  - capsule contains point.
-  - capsule intersects sphere.
-  - capsule AABB bounds.
-- Add frustum extraction variants only when needed:
-  - explicit WebGPU forward-Z is current default.
-  - reverse-Z and OpenGL variants should be named, not inferred.
+- `aabbEmpty()` / `aabbEmptyInto()` / `aabbIsEmpty()` ship in
+  `geometry/aabb.ts`; derived AABB projections such as closest point and
+  bounding sphere are exposed from `measure`.
+- Triangle measurement operations ship in `measure/triangle.ts`:
+  `triangleNormal(Into)`, `triangleArea`, `triangleDoubleArea`,
+  `triangleBarycentric(Into)`, `triangleClosestPoint(Into)`.
+- Capsule predicates ship in `geometry/capsule.ts`; derived bounds/distance
+  projections are exposed from `measure`:
+  `capsuleContainsPoint`, `capsuleIntersectsSphere`,
+  `capsuleSegmentDistanceSqToPoint`, `capsuleGetAabb(Into)`.
+- Frustum extraction:
+  - WebGPU forward-Z remains the default.
+  - Reverse-Z perspective ships as `mat4PerspectiveReverseZWebGpuRh(Into)`.
+  - OpenGL NDC variant is not added unless a real consumer asks; named,
+    not inferred.
 
 ## P3: Batch And Unsafe Coverage
 
@@ -77,10 +78,9 @@ Collision is the least mature public area. Before calling it public-ready:
   - aliasing contract.
   - packed layout stride.
   - at least one realistic numeric case.
-- Current useful additions to consider:
-  - `unsafeVec3MinF32Many` / `unsafeVec3MaxF32Many`.
-  - `unsafeAabbExpandByPointF32Many`.
-  - `unsafeMat4ComposeTrsF32Many` only if measured useful.
+- Shipped additions: `unsafeVec3MinF32Many`, `unsafeVec3MaxF32Many`,
+  `unsafeAabbExpandByPointF32Many` (mutates a stride-6 box buffer in place).
+- Optional follow-up: `unsafeMat4ComposeTrsF32Many` only if measured useful.
 - Defer WebAssembly/SIMD mat4 multiply for now.
   - Current `unsafeMat4MultiplyF32Many` is competitive with the scalar object
     loop and already beats the measured gl-matrix loop.
@@ -95,9 +95,9 @@ Collision is the least mature public area. Before calling it public-ready:
 
 - Add checked safe counterparts before exposing new unsafe binary projections.
 - Keep generated-code-friendly layout constants next to read/write functions.
-- Add an example that uses `SharedArrayBuffer` plus caller-owned `Atomics`
-  publication.
-- Document that Mensura never owns worker pools or scheduling.
+- `examples/shared-array-buffer-worker.ts` demonstrates
+  `SharedArrayBuffer` + caller-owned `Atomics` publication. Mensura never
+  owns worker pools, scheduling, or `Atomics` calls.
 
 ## P5: Documentation Cleanup
 

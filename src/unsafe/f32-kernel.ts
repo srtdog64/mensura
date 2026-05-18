@@ -420,3 +420,93 @@ export function unsafeMat4MultiplyF32Many(
     out[base + 15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
   }
 }
+
+/**
+ * Componentwise minimum of two packed vec3 streams. Useful for AABB merges
+ * over `min`/`max` pairs.
+ */
+export function unsafeVec3MinF32Many(
+  a: Float32Array,
+  b: Float32Array,
+  out: Float32Array,
+  count: number
+): void {
+  const end = count * 3;
+
+  for (let offset = 0; offset < end; offset += 3) {
+    const ax = a[offset + 0];
+    const ay = a[offset + 1];
+    const az = a[offset + 2];
+    const bx = b[offset + 0];
+    const by = b[offset + 1];
+    const bz = b[offset + 2];
+    out[offset + 0] = ax < bx ? ax : bx;
+    out[offset + 1] = ay < by ? ay : by;
+    out[offset + 2] = az < bz ? az : bz;
+  }
+}
+
+/**
+ * Componentwise maximum of two packed vec3 streams.
+ */
+export function unsafeVec3MaxF32Many(
+  a: Float32Array,
+  b: Float32Array,
+  out: Float32Array,
+  count: number
+): void {
+  const end = count * 3;
+
+  for (let offset = 0; offset < end; offset += 3) {
+    const ax = a[offset + 0];
+    const ay = a[offset + 1];
+    const az = a[offset + 2];
+    const bx = b[offset + 0];
+    const by = b[offset + 1];
+    const bz = b[offset + 2];
+    out[offset + 0] = ax > bx ? ax : bx;
+    out[offset + 1] = ay > by ? ay : by;
+    out[offset + 2] = az > bz ? az : bz;
+  }
+}
+
+/**
+ * Expand a single packed AABB (stride 6: minXYZ, maxXYZ) by N packed points.
+ * The AABB is mutated in place. Initialize the AABB with min = +Infinity and
+ * max = -Infinity for a fresh bound (see `aabbEmptyInto`).
+ *
+ * Layout: `box[0..2]` is min, `box[3..5]` is max. Points are stride 3.
+ */
+export function unsafeAabbExpandByPointF32Many(
+  box: Float32Array,
+  boxOffset: number,
+  points: Float32Array,
+  count: number
+): void {
+  let minX = box[boxOffset + 0];
+  let minY = box[boxOffset + 1];
+  let minZ = box[boxOffset + 2];
+  let maxX = box[boxOffset + 3];
+  let maxY = box[boxOffset + 4];
+  let maxZ = box[boxOffset + 5];
+  const end = count * 3;
+
+  for (let offset = 0; offset < end; offset += 3) {
+    const x = points[offset + 0];
+    const y = points[offset + 1];
+    const z = points[offset + 2];
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (z < minZ) minZ = z;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+    if (z > maxZ) maxZ = z;
+  }
+
+  box[boxOffset + 0] = minX;
+  box[boxOffset + 1] = minY;
+  box[boxOffset + 2] = minZ;
+  box[boxOffset + 3] = maxX;
+  box[boxOffset + 4] = maxY;
+  box[boxOffset + 5] = maxZ;
+}

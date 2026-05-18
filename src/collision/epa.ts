@@ -1,5 +1,5 @@
 import type { Vec3 } from "../core/vec3.js";
-import { dot3, scale3, sub3, sub3Into, cross3Into, mutableVec3, scale3Into } from "../core/vec3.js";
+import { dot3, sub3Into, cross3Into, scale3Into } from "../core/vec3.js";
 import type { MutableVec3 } from "../core/vec3.js";
 import type { Result } from "../core/result.js";
 import { ok, err } from "../core/result.js";
@@ -29,14 +29,28 @@ interface Face {
   distance: number;
 }
 
+function epaSupportInto(
+  supportA: SupportFunction,
+  supportB: SupportFunction,
+  ctx: CollisionContext,
+  dir: Vec3,
+  out: MutableVec3
+): MutableVec3 {
+  scale3Into(dir, -1, ctx.epaTemp);
+  const sA = supportA(dir);
+  const sB = supportB(ctx.epaTemp);
+  return sub3Into(sA, sB, out);
+}
+
 export function epa(
-  simplex: Vec3[],
+  simplex: ArrayLike<Vec3>,
+  simplexSize: number,
   supportA: SupportFunction,
   supportB: SupportFunction,
   ctx: CollisionContext,
   maxIterations: number = 64
 ): Result<EpaResult> {
-  if (simplex.length < 4) {
+  if (simplexSize < 4) {
     return err({
       code: "EPA_DEGENERATE_SIMPLEX",
       message: "EPA requires a tetrahedron simplex with at least 4 points",
@@ -45,14 +59,12 @@ export function epa(
     });
   }
 
-  const support = (dir: Vec3, out: MutableVec3) => {
-    scale3Into(dir, -1, ctx.epaTemp);
-    const sA = supportA(dir);
-    const sB = supportB(ctx.epaTemp);
-    return sub3Into(sA, sB, out);
-  };
-
-  const polytope = [...simplex];
+  const polytope: Vec3[] = [
+    { x: simplex[0].x, y: simplex[0].y, z: simplex[0].z },
+    { x: simplex[1].x, y: simplex[1].y, z: simplex[1].z },
+    { x: simplex[2].x, y: simplex[2].y, z: simplex[2].z },
+    { x: simplex[3].x, y: simplex[3].y, z: simplex[3].z }
+  ];
   const faces: Face[] = [];
 
   const addFace = (a: number, b: number, c: number): Face | null => {
@@ -133,7 +145,7 @@ export function epa(
       });
     }
 
-    support(closestFace.normal, ctx.epaTemp);
+    epaSupportInto(supportA, supportB, ctx, closestFace.normal, ctx.epaTemp);
     const p = { x: ctx.epaTemp.x, y: ctx.epaTemp.y, z: ctx.epaTemp.z };
     const d = dot3(p, closestFace.normal);
 
