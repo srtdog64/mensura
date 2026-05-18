@@ -54,7 +54,7 @@ describe("GPU adapters", () => {
     expect(nearlyEqualAbsRel(mat4TransformPoint3(projection, vec3(0, 0, -1_000_000)).z, 0.999999)).toBe(true);
   });
 
-  it("maps reverse-Z WebGPU perspective with near→1 and far→0", () => {
+  it("maps reverse-Z WebGPU perspective with near to 1 and far to 0", () => {
     const projection = unwrap(mat4PerspectiveReverseZWebGpuRh(Math.PI / 2, 1, 1, 10));
 
     expect(nearlyEqualAbsRel(mat4TransformPoint3(projection, vec3(0, 0, -1)).z, 1)).toBe(true);

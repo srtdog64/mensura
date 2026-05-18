@@ -16,6 +16,19 @@ import {
   vec3
 } from "./dist/core/index.js";
 import { aabb, ray, rayAabbHitDistance } from "./dist/geometry/index.js";
+import {
+  add3IntoMany,
+  cross3IntoMany,
+  distance3IntoMany,
+  dot3IntoMany,
+  length3IntoMany,
+  mat4TransformAffinePoint3IntoMany,
+  mat4TransformDirection3IntoMany,
+  mat4TransformPoint3IntoMany,
+  normalize3IntoMany,
+  quatMultiplyIntoMany,
+  scaleAndAdd3IntoMany
+} from "./dist/batch/index.js";
 import { mat4WriteFloat32, vec3WriteFloat32 } from "./dist/gpu/index.js";
 import {
   unsafeMat4WriteDataViewF32,
@@ -23,6 +36,21 @@ import {
   unsafeVec3WriteDataViewF32,
   unsafeVec3WriteFloat32
 } from "./dist/unsafe/index.js";
+import {
+  unsafeMat4MultiplyF32Many,
+  unsafeMat4TransformAffinePoint3F32Many,
+  unsafeMat4TransformDirection3F32Many,
+  unsafeMat4TransformPoint3F32Many,
+  unsafeQuatMultiplyF32Many,
+  unsafeVec3AddF32Many,
+  unsafeVec3AddF32ManyStride16,
+  unsafeVec3CrossF32Many,
+  unsafeVec3DistanceF32Many,
+  unsafeVec3DotF32Many,
+  unsafeVec3LengthF32Many,
+  unsafeVec3NormalizeF32Many,
+  unsafeVec3ScaleAndAddF32Many
+} from "./dist/unsafe/f32-kernel.js";
 
 const SAMPLES = 7;
 const WARMUP = 2;
@@ -73,6 +101,83 @@ const boxes = Array.from({ length: 128 }, (_, index) =>
 );
 const packed = new Float32Array(64);
 const dataView = new DataView(new ArrayBuffer(256));
+
+const BATCH_SIZE = 256;
+const BATCH_REPEATS = Math.floor(VEC_ITERATIONS / BATCH_SIZE);
+const MAT_BATCH_REPEATS = Math.floor(MAT_ITERATIONS / BATCH_SIZE);
+
+const packedVecA = new Float32Array(BATCH_SIZE * 3);
+const packedVecB = new Float32Array(BATCH_SIZE * 3);
+const packedVecOut = new Float32Array(BATCH_SIZE * 3);
+for (let index = 0; index < BATCH_SIZE; index += 1) {
+  packedVecA[index * 3 + 0] = vecA[index].x;
+  packedVecA[index * 3 + 1] = vecA[index].y;
+  packedVecA[index * 3 + 2] = vecA[index].z;
+  packedVecB[index * 3 + 0] = vecB[index].x;
+  packedVecB[index * 3 + 1] = vecB[index].y;
+  packedVecB[index * 3 + 2] = vecB[index].z;
+}
+const packedMatrix = new Float32Array(16);
+for (let i = 0; i < 16; i += 1) {
+  packedMatrix[i] = matrices[0][i];
+}
+const batchVecOut = Array.from({ length: BATCH_SIZE }, () => mutableVec3());
+const batchDotOut = new Float64Array(BATCH_SIZE);
+const packedDotOut = new Float32Array(BATCH_SIZE);
+const glOutPool = Array.from({ length: BATCH_SIZE }, () => glVec3.create());
+
+const quatA = Array.from({ length: BATCH_SIZE }, (_, index) => ({
+  x: Math.sin(index * 0.1) * 0.3,
+  y: Math.cos(index * 0.1) * 0.3,
+  z: Math.sin(index * 0.07) * 0.3,
+  w: Math.cos(index * 0.07) * 0.9
+}));
+const quatB = Array.from({ length: BATCH_SIZE }, (_, index) => ({
+  x: Math.sin(index * 0.13) * 0.2,
+  y: Math.cos(index * 0.13) * 0.2,
+  z: Math.sin(index * 0.09) * 0.2,
+  w: Math.cos(index * 0.09) * 0.95
+}));
+const quatOut = Array.from({ length: BATCH_SIZE }, () => ({ x: 0, y: 0, z: 0, w: 1 }));
+const packedQuatA = new Float32Array(BATCH_SIZE * 4);
+const packedQuatB = new Float32Array(BATCH_SIZE * 4);
+const packedQuatOut = new Float32Array(BATCH_SIZE * 4);
+for (let index = 0; index < BATCH_SIZE; index += 1) {
+  packedQuatA[index * 4 + 0] = quatA[index].x;
+  packedQuatA[index * 4 + 1] = quatA[index].y;
+  packedQuatA[index * 4 + 2] = quatA[index].z;
+  packedQuatA[index * 4 + 3] = quatA[index].w;
+  packedQuatB[index * 4 + 0] = quatB[index].x;
+  packedQuatB[index * 4 + 1] = quatB[index].y;
+  packedQuatB[index * 4 + 2] = quatB[index].z;
+  packedQuatB[index * 4 + 3] = quatB[index].w;
+}
+
+const packedVecAStride16 = new Float32Array(BATCH_SIZE * 4);
+const packedVecBStride16 = new Float32Array(BATCH_SIZE * 4);
+const packedVecOutStride16 = new Float32Array(BATCH_SIZE * 4);
+for (let index = 0; index < BATCH_SIZE; index += 1) {
+  packedVecAStride16[index * 4 + 0] = vecA[index].x;
+  packedVecAStride16[index * 4 + 1] = vecA[index].y;
+  packedVecAStride16[index * 4 + 2] = vecA[index].z;
+  packedVecBStride16[index * 4 + 0] = vecB[index].x;
+  packedVecBStride16[index * 4 + 1] = vecB[index].y;
+  packedVecBStride16[index * 4 + 2] = vecB[index].z;
+}
+
+const MAT_BATCH_SIZE = 128;
+const MAT_PAIR_REPEATS = Math.floor(MAT_ITERATIONS / MAT_BATCH_SIZE);
+const packedMatA = new Float32Array(MAT_BATCH_SIZE * 16);
+const packedMatB = new Float32Array(MAT_BATCH_SIZE * 16);
+const packedMatOut = new Float32Array(MAT_BATCH_SIZE * 16);
+for (let index = 0; index < MAT_BATCH_SIZE; index += 1) {
+  const source = matrices[index & 127];
+  for (let k = 0; k < 16; k += 1) {
+    packedMatA[index * 16 + k] = source[k];
+    packedMatB[index * 16 + k] = matrices[(index + 1) & 127][k];
+  }
+}
+const glMatPool = Array.from({ length: MAT_BATCH_SIZE }, () => glMat4.create());
 
 const cases = [
   {
@@ -376,6 +481,430 @@ const cases = [
         unsafeMat4WriteDataViewF32(matrices[index & 127], dataView, 64);
         sink += dataView.getFloat32(64, true);
       }
+    }
+  },
+  {
+    group: "vec3 add batch",
+    name: "scalar object loop (add3Into)",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          add3Into(vecA[i], vecB[i], batchVecOut[i]);
+        }
+      }
+      sink += batchVecOut[0].x;
+    }
+  },
+  {
+    group: "vec3 add batch",
+    name: "Mensura add3IntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        add3IntoMany(vecA, vecB, batchVecOut, BATCH_SIZE);
+      }
+      sink += batchVecOut[0].x;
+    }
+  },
+  {
+    group: "vec3 add batch",
+    name: "unsafe vec3 F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3AddF32Many(packedVecA, packedVecB, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[0];
+    }
+  },
+  {
+    group: "vec3 add batch",
+    name: "gl-matrix loop",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          glVec3.add(glOutPool[i], glVecA[i], glVecB[i]);
+        }
+      }
+      sink += glOutPool[0][0];
+    }
+  },
+  {
+    group: "vec3 normalize batch",
+    name: "scalar object loop (normalize3Into)",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          normalize3Into(vecA[i], batchVecOut[i]);
+        }
+      }
+      sink += batchVecOut[0].y;
+    }
+  },
+  {
+    group: "vec3 normalize batch",
+    name: "Mensura normalize3IntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        normalize3IntoMany(vecA, batchVecOut, BATCH_SIZE);
+      }
+      sink += batchVecOut[0].y;
+    }
+  },
+  {
+    group: "vec3 normalize batch",
+    name: "unsafe vec3 F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3NormalizeF32Many(packedVecA, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[1];
+    }
+  },
+  {
+    group: "vec3 normalize batch",
+    name: "gl-matrix loop",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          glVec3.normalize(glOutPool[i], glVecA[i]);
+        }
+      }
+      sink += glOutPool[0][1];
+    }
+  },
+  {
+    group: "mat4 affine transform batch",
+    name: "scalar object loop (affinePoint3Into)",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          mat4TransformAffinePoint3Into(matrices[0], vecA[i], batchVecOut[i]);
+        }
+      }
+      sink += batchVecOut[0].z;
+    }
+  },
+  {
+    group: "mat4 affine transform batch",
+    name: "Mensura affinePoint3IntoMany",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        mat4TransformAffinePoint3IntoMany(matrices[0], vecA, batchVecOut, BATCH_SIZE);
+      }
+      sink += batchVecOut[0].z;
+    }
+  },
+  {
+    group: "mat4 affine transform batch",
+    name: "unsafe mat4 affine F32 Many",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        unsafeMat4TransformAffinePoint3F32Many(packedMatrix, 0, packedVecA, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[2];
+    }
+  },
+  {
+    group: "mat4 affine transform batch",
+    name: "gl-matrix loop",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          glVec3.transformMat4(glOutPool[i], glVecA[i], glMatrices[0]);
+        }
+      }
+      sink += glOutPool[0][2];
+    }
+  },
+  {
+    group: "vec3 add batch (WGSL stride 16)",
+    name: "unsafe vec3 F32 Many (stride 12)",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3AddF32Many(packedVecA, packedVecB, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[0];
+    }
+  },
+  {
+    group: "vec3 add batch (WGSL stride 16)",
+    name: "unsafe vec3 F32 Many (stride 16, WGSL)",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3AddF32ManyStride16(
+          packedVecAStride16,
+          packedVecBStride16,
+          packedVecOutStride16,
+          BATCH_SIZE
+        );
+      }
+      sink += packedVecOutStride16[0];
+    }
+  },
+  {
+    group: "mat4 multiply batch",
+    name: "scalar object loop (mat4MultiplyInto)",
+    iterations: MAT_BATCH_SIZE * MAT_PAIR_REPEATS,
+    run: () => {
+      const out = mat4Identity();
+      for (let r = 0; r < MAT_PAIR_REPEATS; r += 1) {
+        for (let i = 0; i < MAT_BATCH_SIZE; i += 1) {
+          mat4MultiplyInto(matrices[i & 127], matrices[(i + 1) & 127], out);
+        }
+      }
+      sink += out[12];
+    }
+  },
+  {
+    group: "mat4 multiply batch",
+    name: "unsafe mat4 F32 Many",
+    iterations: MAT_BATCH_SIZE * MAT_PAIR_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_PAIR_REPEATS; r += 1) {
+        unsafeMat4MultiplyF32Many(packedMatA, packedMatB, packedMatOut, MAT_BATCH_SIZE);
+      }
+      sink += packedMatOut[12];
+    }
+  },
+  {
+    group: "mat4 multiply batch",
+    name: "gl-matrix loop",
+    iterations: MAT_BATCH_SIZE * MAT_PAIR_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_PAIR_REPEATS; r += 1) {
+        for (let i = 0; i < MAT_BATCH_SIZE; i += 1) {
+          glMat4.multiply(glMatPool[i], glMatrices[i & 127], glMatrices[(i + 1) & 127]);
+        }
+      }
+      sink += glMatPool[0][12];
+    }
+  },
+  {
+    group: "vec3 dot batch",
+    name: "Mensura dot3IntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        dot3IntoMany(vecA, vecB, batchDotOut, BATCH_SIZE);
+      }
+      sink += batchDotOut[0];
+    }
+  },
+  {
+    group: "vec3 dot batch",
+    name: "unsafe vec3 dot F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3DotF32Many(packedVecA, packedVecB, packedDotOut, BATCH_SIZE);
+      }
+      sink += packedDotOut[0];
+    }
+  },
+  {
+    group: "vec3 dot batch",
+    name: "gl-matrix loop",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          batchDotOut[i] = glVec3.dot(glVecA[i], glVecB[i]);
+        }
+      }
+      sink += batchDotOut[0];
+    }
+  },
+  {
+    group: "vec3 cross batch",
+    name: "Mensura cross3IntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        cross3IntoMany(vecA, vecB, batchVecOut, BATCH_SIZE);
+      }
+      sink += batchVecOut[0].x;
+    }
+  },
+  {
+    group: "vec3 cross batch",
+    name: "unsafe vec3 cross F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3CrossF32Many(packedVecA, packedVecB, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[0];
+    }
+  },
+  {
+    group: "vec3 cross batch",
+    name: "gl-matrix loop",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          glVec3.cross(glOutPool[i], glVecA[i], glVecB[i]);
+        }
+      }
+      sink += glOutPool[0][0];
+    }
+  },
+  {
+    group: "mat4 transform batch (perspective)",
+    name: "Mensura transformPoint3IntoMany",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        mat4TransformPoint3IntoMany(matrices[0], vecA, batchVecOut, BATCH_SIZE);
+      }
+      sink += batchVecOut[0].z;
+    }
+  },
+  {
+    group: "mat4 transform batch (perspective)",
+    name: "unsafe mat4 transformPoint3 F32 Many",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        unsafeMat4TransformPoint3F32Many(packedMatrix, 0, packedVecA, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[2];
+    }
+  },
+  {
+    group: "mat4 transform batch (perspective)",
+    name: "gl-matrix loop",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        for (let i = 0; i < BATCH_SIZE; i += 1) {
+          glVec3.transformMat4(glOutPool[i], glVecA[i], glMatrices[0]);
+        }
+      }
+      sink += glOutPool[0][2];
+    }
+  },
+  {
+    group: "vec3 length batch",
+    name: "Mensura length3IntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        length3IntoMany(vecA, batchDotOut, BATCH_SIZE);
+      }
+      sink += batchDotOut[0];
+    }
+  },
+  {
+    group: "vec3 length batch",
+    name: "unsafe vec3 length F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3LengthF32Many(packedVecA, packedDotOut, BATCH_SIZE);
+      }
+      sink += packedDotOut[0];
+    }
+  },
+  {
+    group: "vec3 distance batch",
+    name: "Mensura distance3IntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        distance3IntoMany(vecA, vecB, batchDotOut, BATCH_SIZE);
+      }
+      sink += batchDotOut[0];
+    }
+  },
+  {
+    group: "vec3 distance batch",
+    name: "unsafe vec3 distance F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3DistanceF32Many(packedVecA, packedVecB, packedDotOut, BATCH_SIZE);
+      }
+      sink += packedDotOut[0];
+    }
+  },
+  {
+    group: "vec3 scaleAndAdd batch",
+    name: "Mensura scaleAndAdd3IntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        scaleAndAdd3IntoMany(vecA, vecB, 0.25, batchVecOut, BATCH_SIZE);
+      }
+      sink += batchVecOut[0].x;
+    }
+  },
+  {
+    group: "vec3 scaleAndAdd batch",
+    name: "unsafe vec3 scaleAndAdd F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeVec3ScaleAndAddF32Many(packedVecA, packedVecB, 0.25, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[0];
+    }
+  },
+  {
+    group: "quat multiply batch",
+    name: "Mensura quatMultiplyIntoMany",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        quatMultiplyIntoMany(quatA, quatB, quatOut, BATCH_SIZE);
+      }
+      sink += quatOut[0].w;
+    }
+  },
+  {
+    group: "quat multiply batch",
+    name: "unsafe quat multiply F32 Many",
+    iterations: BATCH_SIZE * BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < BATCH_REPEATS; r += 1) {
+        unsafeQuatMultiplyF32Many(packedQuatA, packedQuatB, packedQuatOut, BATCH_SIZE);
+      }
+      sink += packedQuatOut[3];
+    }
+  },
+  {
+    group: "mat4 transform direction batch",
+    name: "Mensura transformDirection3IntoMany",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        mat4TransformDirection3IntoMany(matrices[0], vecA, batchVecOut, BATCH_SIZE);
+      }
+      sink += batchVecOut[0].z;
+    }
+  },
+  {
+    group: "mat4 transform direction batch",
+    name: "unsafe mat4 transformDirection3 F32 Many",
+    iterations: BATCH_SIZE * MAT_BATCH_REPEATS,
+    run: () => {
+      for (let r = 0; r < MAT_BATCH_REPEATS; r += 1) {
+        unsafeMat4TransformDirection3F32Many(packedMatrix, 0, packedVecA, packedVecOut, BATCH_SIZE);
+      }
+      sink += packedVecOut[2];
     }
   }
 ];

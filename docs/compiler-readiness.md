@@ -16,6 +16,7 @@ accel     acceleration structures and broadphase traversal
 world     orchestration over collision bodies and acceleration structures
 layout    WGSL-compatible byte layout metadata
 data      checked DataView projection records with Result failures
+batch     object-array batch kernels that preserve semantic value shapes
 gpu       named WebGPU projection helpers and Float32Array transport
 unsafe    unchecked binary/typed-array projection for generated or hot code
 physics   compatibility facade for accel/collision/world

@@ -14,7 +14,7 @@ assumption.
 2. **One context per concurrent caller.** Two workers must each hold their own
    context. A single worker that issues two concurrent narrowphase calls
    (reentrancy via async/await or callbacks) must use two separate contexts.
-   Mensura functions do not lock — they assume serial use of their context.
+   Mensura functions do not lock; they assume serial use of their context.
 3. **Module-level scratch is forbidden in hot paths.** No `const _tmp = ...`
    shared across calls inside a module. Past code that did this has been
    migrated; new code should not reintroduce it. The legitimate exception is
@@ -26,7 +26,7 @@ assumption.
    `postMessage`) for one-shot delivery, or convert to `Float32Array`.
 5. **`Float32Array` bridges are the shared-memory surface.** `gpu/float32.ts`
    and `unsafe/f32.ts` operate on any `Float32Array`, including views backed by
-   `SharedArrayBuffer`. There are no implicit copies — the writer writes
+   `SharedArrayBuffer`. There are no implicit copies; the writer writes
    directly into the provided view.
 6. **`Atomics` is the caller's responsibility.** Mensura writers do not use
    `Atomics.store` / `Atomics.notify`. If the buffer is shared, the caller
@@ -79,12 +79,12 @@ not interact with `Atomics`. The caller decides on the publication protocol.
 
 ## What Mensura Does Not Provide
 
-- Worker pools — outside scope. Mensura is the kernel; orchestration belongs to
+- Worker pools: outside scope. Mensura is the kernel; orchestration belongs to
   the consumer (Geukbit, Zeno, application code).
-- `SharedArrayBuffer`-backed `Vec3` / `Mat4` value types — current public API
+- `SharedArrayBuffer`-backed `Vec3` / `Mat4` value types: current public API
   stays as inspectable objects. A future packed view type would land in
   `unsafe/` with explicit naming.
-- Lock-free narrowphase data structures — every callee assumes serial use of
+- Lock-free narrowphase data structures: every callee assumes serial use of
   its context. Concurrency comes from worker isolation, not from sharing
   contexts across threads.
 
@@ -95,4 +95,4 @@ not interact with `Atomics`. The caller decides on the publication protocol.
   share a `SharedArrayBuffer` view, which is the caller's protocol.
 - When introducing a new hot-path API, add it with a context argument from the
   start. Do not introduce a module-scratch helper as a "fast path" and migrate
-  later — the migration cost has already been paid once.
+  later; the migration cost has already been paid once.

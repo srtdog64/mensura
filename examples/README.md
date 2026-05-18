@@ -12,11 +12,14 @@ specific example with `tsx`, `ts-node`, or after `tsc` against
 
 ## Files
 
-- [camera-projection.ts](camera-projection.ts) — RH view + WebGPU `0..1`
+- [camera-projection.ts](camera-projection.ts): RH view + WebGPU `0..1`
   perspective + frustum-AABB culling + ray-AABB picking.
-- [transform-trs.ts](transform-trs.ts) — `mat4Compose` / `mat4Decompose`
-  roundtrip and `det < 0 → scale.x` flip behaviour.
-- [quaternion-ops.ts](quaternion-ops.ts) — `quatFromUnitVectors`,
+- [transform-trs.ts](transform-trs.ts): `mat4Compose` / `mat4Decompose`
+  roundtrip and `det < 0 -> scale.x` flip behaviour.
+- [quaternion-ops.ts](quaternion-ops.ts): `quatFromUnitVectors`,
   `quatConjugate`, `quatSlerp` with the lerp-fallback threshold.
-- [error-handling.ts](error-handling.ts) — `Result<T>` patterns: `unwrap`,
+- [error-handling.ts](error-handling.ts): `Result<T>` patterns: `unwrap`,
   discriminated check, error-code switch.
+- [batch-and-unsafe.ts](batch-and-unsafe.ts): batch `*IntoMany` over semantic
+  Vec3 objects vs `unsafe/*F32Many` over packed `Float32Array` /
+  `SharedArrayBuffer`. Rule-of-thumb decision table at the bottom.

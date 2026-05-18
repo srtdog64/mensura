@@ -1,166 +1,119 @@
 # Mensura TODO
 
-## P0: Floating-Point Foundation
+This file tracks remaining work after the v0.1 kernel pass. It should reflect
+the current package shape, not the historical reference-reading checklist.
 
-Mensura starts with floating-point correctness because every later geometry
-primitive depends on stable tolerance rules.
+## Current Baseline
 
-- Define the default float policy:
-  - `f32` vs JavaScript `number` behavior
-  - absolute tolerance
-  - relative tolerance
-  - max ULP tolerance
-- Track conversion loss as first-class data:
-  - rounded value
-  - exact/lossy flag
-  - absolute error
-  - relative error
-  - local epsilon
-  - error measured in local epsilon/ULPs
-- Implement and test ULP helpers:
-  - `float32ToOrderedUint32`
-  - `ulpDiffF32`
-  - `nearlyEqualUlpsF32`
-  - `nextUpF32`
-  - `nextDownF32`
-  - `epsilonF32At`
-  - `conversionLossF32`
-- Document when to use:
-  - exact equality
-  - absolute/relative tolerance
-  - ULP tolerance
-  - conversion loss function
-- Add edge-case tests:
-  - `+0` and `-0`
-  - `NaN`
-  - `Infinity`
-  - subnormal values
-  - adjacent representable `f32` values
+Already in place:
 
-## P1: Vector And Transform Core
+- `core`: float policy, conversion loss, vec3/vec4, mat3/mat4, quat, euler,
+  dual-quat, `Result`.
+- `geometry`: ray, plane, AABB, sphere, OBB, capsule, frustum, triangle mesh.
+- `query`: ray hit data, ray/plane/AABB/sphere/triangle tests, frustum tests.
+- `collision`: SAT, GJK, EPA with caller-owned `CollisionContext`.
+- `accel`: BVH with caller-owned `AccelContext`.
+- `world`: `CollisionWorld` orchestration over bodies and BVH.
+- `layout` / `data`: WGSL-compatible layout metadata and checked DataView
+  projection.
+- `batch`: object-array `*IntoMany` kernels.
+- `gpu`: WebGPU projection and Float32Array bridge.
+- `unsafe`: explicit packed Float32Array and DataView helpers.
+- Verification gates: `npm run check`, `npm run benchmark`,
+  `npm pack --dry-run`.
 
-- `Vec2`
-- `Vec3`
-- `Quat`
-- `Mat4`
-- document coordinate convention:
-  - right-handed
-  - Y-up
-  - `-Z` forward
-  - column-vector math
-  - column-major storage/export
-  - WebGPU/DirectX-style clip depth `0..1`
-  - floor-based `worldToGrid`
-  - inclusive AABB boundary
-- transform compose/decompose
-- dot/cross/normalize/length/distance
-- allocation-free variants for hot paths
+## P0: API Freeze Prep
 
-### P1 borrowings (see `reference-library-notes.md` §1, §2)
+- Review root facade exports and decide which subpaths are stable for v0.1:
+  `core`, `geometry`, `query`, `gpu`, `layout`, `data`, `batch`, `unsafe`.
+- Keep `physics` as a compatibility facade only. Do not add new primary APIs
+  there.
+- Decide whether `collision`, `accel`, and `world` are experimental or v0.1
+  public. If experimental, document that clearly in README.
+- Add a short `docs/api-stability.md` with stable, experimental, and unsafe
+  surfaces.
+- Make naming consistent:
+  - `Into` means caller-owned single output.
+  - `IntoMany` means object-array batch.
+  - `unsafe*F32Many` means packed Float32Array batch.
 
-- `mat4Invert` / `mat4InvertInto`: detect `det == 0` and return
-  `Result<MutableMat4, AppError>`; reuse the cofactor expansion from
-  `Matrix4.js:712` and gl-matrix `mat4.js:293`.
-- `mat4LookAtRh` / `mat4LookAtRhInto`: detect `eye ≈ center` and `up ∥ z` from
-  gl-matrix `mat4.js:1740` / `Matrix4.js:483`; report the degenerate basis as
-  `Result.error`, not by perturbing the basis.
-- `mat4PerspectiveReverseZWebGpuRh` / `…Into` as a sibling to the existing
-  WebGPU perspective (do **not** branch inside `mat4PerspectiveWebGpuRh`); copy
-  the signature shape from `mat4-impl.ts:840` but keep Mensura's argument
-  validator (`assertPerspectiveArgs`).
-- `quatSlerp` / `…Into`: lerp fallback when `cosHalfTheta > 0.9995`, threshold
-  exported as `QUAT_SLERP_LINEAR_THRESHOLD` (`Quaternion.js:719`).
-- `quatFromRotationMatrix`: port the four trace branches from
-  `Quaternion.js:405` verbatim — numerical stability matters here.
-- `quatFromUnitVectors`: parallel / anti-parallel split with `ε = 1e-8`
-  (`Quaternion.js:471`); anti-parallel case with no stable orthogonal axis
-  returns `Result.error`.
-- `mat4Compose` / `mat4Decompose` (`Matrix4.js:1004`, `:1053`): port including
-  the `det < 0 → flip scale.x` trick used in decompose.
-- Follow-up policy: migrate `assertPerspectiveArgs` (currently `throw`) to
-  `Result` (CLAUDE.md Result-First policy). Not in this batch.
+## P1: Collision Witnesses
 
-## P2: Geometry Primitives
+Collision is the least mature public area. Before calling it public-ready:
 
-- `Ray`
-- `Plane`
-- `AABB`
-- `Sphere`
-- `Frustum`
-- `Bounds`
+- SAT:
+  - rotated OBB vs OBB overlap.
+  - separated rotated OBBs.
+  - touching boundary case.
+  - near-parallel axes case.
+- GJK:
+  - sphere-like support hit and miss are covered; add box support hit/miss.
+  - containment case.
+  - touching case.
+  - max-iteration failure witness with a deliberately bad support function.
+- EPA:
+  - degenerate simplex is covered.
+  - add a simple successful penetration-depth witness.
+  - add a non-converging/max-iteration witness if deterministic.
 
-### P2 borrowings (see `reference-library-notes.md` §1, §2.3)
+## P2: Geometry Breadth
 
-- `aabbEmpty()`: seed `min = +Infinity`, `max = -Infinity` so `expandByPoint`
-  always converges (`Box3.js:189`).
-- `aabbExpandByPoint` / `aabbExpandByPointInto`: per-component min/max
-  (`Box3.js:243`).
-- `aabbGetBoundingSphere` / `…Into`: empty AABB → empty sphere contract
-  (`Box3.js:606`).
-- `planeNormalizeInto`: already in `src/plane.ts` and matches `Plane.js:143`
-  (constant scaled with the normal). Verification only; no change.
-- `frustumFromProjectionMatrixWebGpuRh` / `…WebGpuRhReverseZ` /
-  `…OpenGlRh` — six-plane extraction (`Frustum.js:95`). The
-  Mensura default (no NDC suffix) targets WebGPU `0..1`; the OpenGL form is
-  exposed by an explicitly named helper.
+- Add `aabbEmpty()` and `aabbIsEmpty()`.
+- Add `aabbGetBoundingSphere` / `aabbGetBoundingSphereInto`.
+- Add triangle primitive helpers:
+  - normal.
+  - area.
+  - closest point.
+  - barycentric coordinate helper.
+- Add capsule query coverage:
+  - capsule contains point.
+  - capsule intersects sphere.
+  - capsule AABB bounds.
+- Add frustum extraction variants only when needed:
+  - explicit WebGPU forward-Z is current default.
+  - reverse-Z and OpenGL variants should be named, not inferred.
 
-## P3: Intersection And Culling
+## P3: Batch And Unsafe Coverage
 
-- ray-plane intersection
-- ray-AABB intersection
-- ray-sphere intersection
-- AABB/AABB overlap
-- sphere/AABB overlap
-- frustum-AABB test
-- frustum-sphere test
+- Keep object batch and unsafe packed kernels semantically paired where useful.
+- Do not add unsafe kernels without tests that cover:
+  - count-limited writes.
+  - aliasing contract.
+  - packed layout stride.
+  - at least one realistic numeric case.
+- Current useful additions to consider:
+  - `unsafeVec3MinF32Many` / `unsafeVec3MaxF32Many`.
+  - `unsafeAabbExpandByPointF32Many`.
+  - `unsafeMat4ComposeTrsF32Many` only if measured useful.
+- Defer WebAssembly/SIMD mat4 multiply for now.
+  - Current `unsafeMat4MultiplyF32Many` is competitive with the scalar object
+    loop and already beats the measured gl-matrix loop.
+  - WASM only makes sense after a real workload shows repeated batches around
+    N >= 512 where matrix multiply is the bottleneck.
+  - Do not add WASM to the root or normal unsafe surface. If this is revived,
+    create an explicit `wasm` or `unsafe/wasm` layer with documented
+    `WebAssembly.Memory` ownership, fallback behavior, generation steps, and
+    checksum/provenance for the shipped binary.
 
-### P3 borrowings (see `reference-library-notes.md` §1, §2.3)
+## P4: Compiler And Worker Integration
 
-- `rayIntersectPlane` / `…Into`: denominator sign check + `t >= 0` filter
-  (`Ray.js:397`). The `t >= 0` policy is already documented in
-  `coordinate-matrix-conventions.md`.
-- `rayIntersectAabb` / `…Into`: slab method with cached `invdir` and an
-  `isNaN` guard for axis-aligned rays (`Ray.js:451`).
-- `rayIntersectSphere` / `…Into`: geometric `tca / d² / thc` form, sqrt only on
-  the accept path (`Ray.js:311`).
-- `rayIntersectTriangle` / `…Into`: Möller-Trumbore as in `Ray.js:540`.
-  The `backfaceCulling` flag is deferred — Mensura returns hit data; the
-  consumer decides whether to ignore backfaces.
-- `frustumIntersectsSphere` / `frustumIntersectsAabb` (`Frustum.js:193`,
-  `:221`): "negative distance on any plane → outside" loops.
+- Add checked safe counterparts before exposing new unsafe binary projections.
+- Keep generated-code-friendly layout constants next to read/write functions.
+- Add an example that uses `SharedArrayBuffer` plus caller-owned `Atomics`
+  publication.
+- Document that Mensura never owns worker pools or scheduling.
 
-### P3 regression tests
+## P5: Documentation Cleanup
 
-- WebGPU perspective contract: assert
-  `mat4TransformPoint3(mat4PerspectiveWebGpuRh(...), (0, 0, -near)) ≈ (0, 0, 0)`
-  and `(0, 0, -far) → (0, 0, 1)` (mirrors `wgpu-matrix/test/tests/mat4-test.js:465`).
-- Same contract for `mat4PerspectiveReverseZWebGpuRh`, with the depth ends
-  swapped.
-- `(0, 0, -far) → (0, 0, 1)` test must also pass when `far = Infinity`, since
-  Mensura's perspective already has the infinite-far branch.
-
-## P4: Grid And World Coordinates
-
-- grid-to-world conversion
-- world-to-grid conversion
-- cell bounds
-- plane chunk coordinates
-- integer-safe cell key helpers
-
-## P5: Geukbit Dogfood Targets
-
-- viewport picking
-- camera frustum guide
-- light range guide
-- transform gizmo placement
-- grid placement
-- terrain tile/world conversion
-- prefab bounds
-- selection bounds
-- visibility culling
+- Keep `docs/performance.md` tied to a real `npm run benchmark` output.
+- Keep `docs/multithreading.md` aligned with context-based collision/accel
+  APIs.
+- Keep reference-library notes as historical rationale only; do not let them
+  override current code truth.
+- Add `README` badges or status only after the API freeze policy is written.
 
 ## Package Boundary
 
-Mensura must not depend on Geukbit, Three.js, React, Zeno, Insere, or Ordo.
-Those packages may consume Mensura, but Mensura remains the lower-level spatial
-kernel.
+Mensura must not depend on Geukbit, Three.js, React, Zeno, Insere, Ordo, or any
+host engine. Those packages may consume Mensura, but Mensura remains the
+lower-level spatial math and geometry kernel.

@@ -61,6 +61,7 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/world     collision world orchestration
 @exornea/mensura/layout    WGSL-compatible byte layout metadata
 @exornea/mensura/data      checked DataView projection records
+@exornea/mensura/batch     object-array batch kernels for hot loops
 @exornea/mensura/physics   compatibility facade for accel/collision/world
 @exornea/mensura/gpu       WebGPU projection and packed Float32Array bridges
 @exornea/mensura/unsafe    unchecked binary and typed-array projection helpers
@@ -70,7 +71,8 @@ The root facade exports the primary layers. `physics` remains as a compatibility
 facade for older imports, but new code should import `query`, `collision`,
 `accel`, and `world` by responsibility. `layout` describes byte-level records;
 `data` is the checked `Result`-first bridge from semantic values into those
-records.
+records. `batch` keeps the inspectable object policy while amortizing call
+overhead across many values.
 
 `unsafe` is intentionally not re-exported by the root facade. Import it by name
 when a caller owns the buffer layout, bounds checks, and aliasing contract.

@@ -76,6 +76,14 @@
       "types": "./dist/data/*.d.ts",
       "default": "./dist/data/*.js"
     },
+    "./batch": {
+      "types": "./dist/batch/index.d.ts",
+      "default": "./dist/batch/index.js"
+    },
+    "./batch/*": {
+      "types": "./dist/batch/*.d.ts",
+      "default": "./dist/batch/*.js"
+    },
     "./physics": {
       "types": "./dist/physics/index.d.ts",
       "default": "./dist/physics/index.js"

@@ -12,7 +12,7 @@ const rotation = quat(0, Math.SQRT1_2, 0, Math.SQRT1_2);
 const scale = vec3(2, 3, 4);
 
 const transform = mat4Compose(translation, rotation, scale);
-console.log("origin →", mat4TransformPoint3(transform, vec3(0, 0, 0)));
+console.log("origin to", mat4TransformPoint3(transform, vec3(0, 0, 0)));
 
 const decomposed = mat4Decompose(transform);
 console.log("translation:", decomposed.translation);
