@@ -22,7 +22,7 @@ These layers are the primary public surface for `0.1.x`:
 | `@exornea/mensura/geometry` | Stable 0.1 | Shape construction and primitive geometry values. |
 | `@exornea/mensura/query` | Stable 0.1 | Ray hits, overlap tests, and frustum culling helpers. |
 | `@exornea/mensura/measure` | Stable 0.1 | Derived primitive measurements and projections such as AABB closest point, capsule bounds, triangle area, normal, barycentric coordinates, closest point, and `Result`-first `*Checked` measurement wrappers. |
-| `@exornea/mensura/validation` | Stable 0.1 | `Result`-first finite, range, float32-stability, non-empty, and non-degenerate checks before measurement or serialization. |
+| `@exornea/mensura/validation` | Stable 0.1 | `Result`-first finite, range, float32-stability, non-empty, non-degenerate, and reproducibility seed/RNG/distribution checks before measurement, serialization, or deterministic stress generation. |
 | `@exornea/mensura/gpu` | Stable 0.1 | WebGPU projection helpers and checked Float32Array bridges. |
 | `@exornea/mensura/layout` | Stable 0.1 | WGSL-compatible layout constants and byte offsets. |
 | `@exornea/mensura/data` | Stable 0.1 | Checked `Result`-first DataView projection layer. |

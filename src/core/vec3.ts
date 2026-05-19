@@ -55,9 +55,15 @@ export function add3(a: Vec3, b: Vec3): Vec3 {
 }
 
 export function add3Into(a: Vec3, b: Vec3, out: MutableVec3): MutableVec3 {
-  out.x = a.x + b.x;
-  out.y = a.y + b.y;
-  out.z = a.z + b.z;
+  const ax = a.x;
+  const ay = a.y;
+  const az = a.z;
+  const bx = b.x;
+  const by = b.y;
+  const bz = b.z;
+  out.x = ax + bx;
+  out.y = ay + by;
+  out.z = az + bz;
   return out;
 }
 

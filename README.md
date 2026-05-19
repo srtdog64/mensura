@@ -62,7 +62,7 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/layout    WGSL-compatible byte layout metadata
 @exornea/mensura/data      checked DataView projection records
 @exornea/mensura/measure   closest points, bounds, areas, barycentric data
-@exornea/mensura/validation Result-first finite, non-empty, non-degenerate checks
+@exornea/mensura/validation Result-first checks and reproducible seed helpers
 @exornea/mensura/batch     object-array batch kernels for hot loops
 @exornea/mensura/physics   compatibility facade for accel/collision/world
 @exornea/mensura/gpu       WebGPU projection and packed Float32Array bridges
@@ -85,7 +85,9 @@ triangle normals, areas, barycentric coordinates, and triangle closest points.
 It also exposes `*Checked` variants for boundary callers that want invalid
 measure domains surfaced as `Result` errors.
 `validation` owns `Result`-first precondition checks for finite values,
-non-empty bounds, non-degenerate triangles, and stable float32 conversion loss.
+non-empty bounds, non-degenerate triangles, stable float32 conversion loss, and
+deterministic seed/RNG/distribution helpers for reproducible stress or benchmark
+inputs.
 `layout` describes byte-level records; `data` is the checked `Result`-first
 bridge from semantic values into those records. `batch` keeps the inspectable
 object policy while amortizing call overhead across many values.
@@ -162,6 +164,32 @@ console.log(rayAabbHitDistance(pickRay, bounds));
 
 Worked examples (camera+frustum, TRS compose/decompose, quaternion operations,
 Result-based error handling) live under [examples/](examples/).
+
+## Release Gate
+
+```sh
+npm run check:release
+```
+
+This runs build, tests, `npm pack --dry-run`, and the benchmark threshold gate.
+If a release-blocking hot path falls below its relative performance floor, the
+command fails.
+
+## Contributions
+
+All contribution commits require a DCO sign-off:
+
+```sh
+git commit -s
+```
+
+Before opening a pull request, run:
+
+```sh
+npm run dco:check -- --range origin/master..HEAD
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [DCO.md](DCO.md).
 
 ## Non-Goals
 

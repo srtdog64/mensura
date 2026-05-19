@@ -9,10 +9,16 @@ export function add3IntoMany(
   for (let i = 0; i < count; i++) {
     const va = a[i];
     const vb = b[i];
+    const ax = va.x;
+    const ay = va.y;
+    const az = va.z;
+    const bx = vb.x;
+    const by = vb.y;
+    const bz = vb.z;
     const vo = out[i];
-    vo.x = va.x + vb.x;
-    vo.y = va.y + vb.y;
-    vo.z = va.z + vb.z;
+    vo.x = ax + bx;
+    vo.y = ay + by;
+    vo.z = az + bz;
   }
   return out;
 }

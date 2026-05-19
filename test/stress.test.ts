@@ -33,17 +33,10 @@ import { aabb, ray } from "../src/geometry/index.js";
 import { rayIntersectsAabb } from "../src/query/index.js";
 import { AccelContext, buildBvh, bvhRaycast } from "../src/accel/index.js";
 import { unwrap } from "../src/core/result.js";
+import { createDeterministicRng, seedFromString, type DeterministicRng } from "../src/validation/index.js";
 
-function makeRng(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    return state / 0x100000000;
-  };
-}
-
-function range(rng: () => number, min: number, max: number): number {
-  return min + (max - min) * rng();
+function range(rng: DeterministicRng, min: number, max: number): number {
+  return rng.range(min, max);
 }
 
 function maxVec3PackedError(values: ArrayLike<Vec3>, packed: Float32Array, count: number): number {
@@ -85,7 +78,7 @@ function sortedNumbers(values: number[]): number[] {
 describe("deterministic stress coverage", () => {
   it("keeps object batch and unsafe packed vec3 kernels aligned over large inputs", () => {
     const count = 4096;
-    const rng = makeRng(0x4d454e53);
+    const rng = createDeterministicRng(seedFromString("mensura:stress:vec3-kernels"));
     const a: MutableVec3[] = [];
     const b: MutableVec3[] = [];
     const batchOut = Array.from({ length: count }, () => mutableVec3());
@@ -125,7 +118,7 @@ describe("deterministic stress coverage", () => {
 
   it("keeps matrix batch, unsafe matrix kernels, and scalar transforms aligned", () => {
     const count = 2048;
-    const rng = makeRng(0x5446534d);
+    const rng = createDeterministicRng(seedFromString("mensura:stress:affine-transform"));
     const points: MutableVec3[] = [];
     const batchOut = Array.from({ length: count }, () => mutableVec3());
     const scalarOut = Array.from({ length: count }, () => mutableVec3());
@@ -155,7 +148,7 @@ describe("deterministic stress coverage", () => {
 
   it("matches unsafe packed mat4 multiplication against scalar mat4MultiplyInto", () => {
     const count = 256;
-    const rng = makeRng(0x4d415434);
+    const rng = createDeterministicRng(seedFromString("mensura:stress:mat4-multiply"));
     const a: MutableMat4[] = [];
     const b: MutableMat4[] = [];
     const expected: MutableMat4[] = [];
@@ -210,7 +203,7 @@ describe("deterministic stress coverage", () => {
 
     const bvh = unwrap(buildBvh(boxes, 1));
     const ctx = new AccelContext();
-    const rng = makeRng(0x42564831);
+    const rng = createDeterministicRng(seedFromString("mensura:stress:bvh-raycast"));
 
     for (let i = 0; i < 96; i++) {
       const origin = vec3(range(rng, -16, 16), range(rng, -16, 16), 8 + range(rng, 0, 6));

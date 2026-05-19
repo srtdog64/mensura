@@ -411,6 +411,13 @@ Error codes (stage defaults to `"Validation"`):
 | `VALIDATION_INVALID_RADIUS` | Sphere or capsule with non-finite or negative `radius`. |
 | `VALIDATION_DEGENERATE_PLANE` | Plane normal length squared below the threshold (default `1e-12`). |
 | `VALIDATION_DEGENERATE_TRIANGLE` | Triangle double-area below the threshold (default `0`). |
+| `VALIDATION_INVALID_SEED` | Reproducibility seed is not a finite uint32 integer. |
+| `VALIDATION_INVALID_RNG_ALGORITHM` | Reproducibility RNG algorithm is not supported. |
+| `VALIDATION_INVALID_RANDOM_DISTRIBUTION` | Reproducibility sample distribution is not supported. |
+| `VALIDATION_INVALID_RANDOM_EXPONENT` | Bias exponent is not finite or positive. |
+| `VALIDATION_INVALID_RANGE` | Integer / bias-bin range is non-integer or inverted. |
+| `VALIDATION_BIAS_OUT_OF_BUDGET` | Sample histogram deviates from uniform beyond the configured tolerance. |
+| `VALIDATION_BIAS_SAMPLE_OUT_OF_RANGE` | A sample fell outside the declared bias-diagnostic range. |
 
 Functions:
 
@@ -429,6 +436,62 @@ Functions:
 - Triangle: `validateTriangle(a, b, c, { minDoubleArea? }) →
   Result<TriangleValidation>` where `TriangleValidation = { doubleArea,
   area }` so the caller can reuse the area downstream without recomputing.
+- Reproducibility:
+  - `validateSeed(seed, options?) → Result<number>` — accepts finite uint32
+    integer seeds.
+  - `validateRngAlgorithm(value, options?) → Result<DeterministicRngAlgorithm>`.
+  - `validateRandomDistribution(value, options?) → Result<RandomDistribution>`.
+  - `seedFromString(label) → number` — stable FNV-1a seed from a scenario label.
+  - `createDeterministicRng(seed, algorithmOrOptions?)` — small deterministic
+    PRNG with `nextUint32`, `nextFloat`, `sample(options?)`, and
+    `range(min, max, options?)`. Supported algorithms are `lcg32`, `xorshift32`,
+    and `mulberry32`; `lcg32` stays the default so old stress seeds replay.
+  - `createValidatedDeterministicRng(seed, options?) → Result<DeterministicRng>`.
+  - `sampleDeterministicUnit(rng, options?) → Result<number>` and
+    `sampleDeterministicRange(rng, min, max, options?) → Result<number>`.
+    Supported distributions:
+    - `uniform` — flat over `[0, 1)`.
+    - `center-biased` — average of two uniforms; same shape as `triangular`
+      but kept separately for naming clarity at call sites.
+    - `triangular` — explicit symmetric triangle on `[0, 1]`, peak 0.5.
+    - `edge-biased` — both ends weighted; `exponent` controls how tightly
+      samples hug 0 and 1. Default `2`.
+    - `low-biased` / `high-biased` — `u^exponent` and `1 - u^exponent`.
+    - `gaussian` — Box-Muller `N(0, 1)` shifted to mean 0.5 and clamped into
+      `[0, 1]` (3σ ≈ unit edge). Long-tail samples saturate the endpoints
+      rather than leak outside the unit interval contract.
+  - `sampleDeterministicInt(rng, min, max) → Result<number>` — uniform integer
+    on `[min, max]` with rejection sampling so the distribution stays exact
+    regardless of range size.
+  - `shuffleInPlace(rng, values) → values` — deterministic Fisher-Yates;
+    returns the same array reference.
+  - Geometric samplers (caller-owned `out`, aliasing-safe):
+    - `sampleUnitDirection3Into(rng, out)` — uniform direction on `S²`
+      (Marsaglia parameterisation; uniform per solid angle, no pole bias).
+    - `sampleInUnitBall3Into(rng, out)` — uniform point in `B³` (radius
+      drawn as `u^(1/3)` to keep volume uniform).
+    - `sampleInAabbInto(rng, box, out, options?) → Result<Vec3Like>` — uniform
+      (or biased) point inside an AABB. Empty AABB returns
+      `VALIDATION_EMPTY_AABB`.
+  - `forkRng(rng, label, options?) → DeterministicRng` — derive a named
+    sub-stream from the current parent state. Two children with the same
+    label replay identically; different labels diverge immediately. Each
+    fork advances the parent once so subsequent parent draws stay disjoint
+    from the children.
+  - **Bias diagnostics** — verify a sample sequence actually looks the way
+    the caller expected:
+    - `summarizeSamples(samples) → { count, min, max, mean, variance,
+      stddev }` — one-pass Welford summary. Returns zeros on empty input.
+    - `validateUniformBias(samples, options?) → Result<UniformBiasReport>` —
+      bucket samples into `bins` (default 16) on `[min, max)` (default
+      `[0, 1)`) and flag bins whose count deviates from the expected count
+      by more than `maxRelativeDeviation` (default 25%). Coarse on purpose:
+      it is a "obviously biased" check for stress harnesses, not a formal
+      statistical test.
+
+  Reproducibility is for stress tests, fixtures, generated benchmark
+  inputs, and asset validation replay. It is not a security or
+  gameplay-randomness primitive.
 
 Use this layer when geometry crosses a trust boundary (asset load, user
 input, RPC body). Inside the hot path, prefer the raw `measure` / `query`

@@ -11,6 +11,8 @@ import type { Plane } from "../geometry/plane.js";
 import type { Sphere } from "../geometry/sphere.js";
 import { triangleDoubleArea } from "../measure/triangle.js";
 
+export * from "./reproducibility.js";
+
 const DEFAULT_STAGE = "Validation";
 
 export interface ValidationOptions {

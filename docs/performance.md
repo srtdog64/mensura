@@ -12,9 +12,33 @@ Run:
 npm run benchmark
 ```
 
+Release gate:
+
+```sh
+npm run benchmark:check
+npm run check:release
+```
+
 The benchmark imports built files from `dist`, so it measures the same ESM
 surface package consumers use. It includes direct `gl-matrix` and
 `wgpu-matrix` comparisons for matching vec3 and mat4 workloads.
+
+`benchmark:check` fails the process when release-blocking hot paths fall below
+their relative thresholds. The gate focuses on claims Mensura actually makes:
+direct `Into` paths must stay within competitive range of gl-matrix and at
+least two of those direct paths must win on the same run. Object-array batch
+kernels must beat the equivalent gl-matrix loop, matrix batches that hoist
+shared reads must beat the scalar Mensura loop, and the documented unsafe fast
+cases must keep their packed-buffer advantage. Immutable helpers such as
+`add3` and `normalize3` allocate inspectable `{x,y,z}` objects and are not the
+hot-path performance claim. Known non-winning cases such as packed mat4
+multiply and unstable cases such as packed quaternion multiply are documented
+guidance, not release blockers.
+
+The gate uses ratios instead of absolute ops/sec because V8 tiering and OS
+scheduling make single-machine microbenchmarks noisy. The threshold constants
+live next to the benchmark cases in `benchmark-runner.js` with comments
+explaining why each family is gated differently.
 
 ## Latest Local Snapshot
 
@@ -170,8 +194,9 @@ Pick the layer based on call shape, not on theoretical fastness:
 | Loop of N >= ~64 calls, semantic objects, quaternion composition | `quatMultiplyIntoMany` |
 | Loop of N >= ~64 calls, semantic objects, direction (no translation) | `mat4TransformDirection3IntoMany` |
 | Semantic <-> packed conversion | `vec3ArrayWriteFloat32` / `vec3ArrayReadFloat32`, `quatArrayWriteFloat32` / `quatArrayReadFloat32`, `mat4ArrayWriteFloat32` / `mat4ArrayReadFloat32` (in `@exornea/mensura/batch`) |
-| Loop of N >= ~64 calls, packed `Float32Array` (or `SharedArrayBuffer` view) | `unsafeVec3AddF32Many`, `unsafeVec3SubF32Many`, `unsafeVec3ScaleF32Many`, `unsafeVec3ScaleAndAddF32Many`, `unsafeVec3NormalizeF32Many`, `unsafeVec3DotF32Many`, `unsafeVec3CrossF32Many`, `unsafeVec3LengthF32Many`, `unsafeVec3DistanceF32Many`, `unsafeQuatMultiplyF32Many`, `unsafeMat4TransformAffinePoint3F32Many`, `unsafeMat4TransformPoint3F32Many`, `unsafeMat4TransformDirection3F32Many` |
+| Loop of N >= ~64 calls, packed `Float32Array` (or `SharedArrayBuffer` view) | `unsafeVec3AddF32Many`, `unsafeVec3SubF32Many`, `unsafeVec3ScaleF32Many`, `unsafeVec3ScaleAndAddF32Many`, `unsafeVec3NormalizeF32Many`, `unsafeVec3DotF32Many`, `unsafeVec3CrossF32Many`, `unsafeVec3LengthF32Many`, `unsafeVec3DistanceF32Many`, `unsafeMat4TransformAffinePoint3F32Many`, `unsafeMat4TransformPoint3F32Many`, `unsafeMat4TransformDirection3F32Many` |
 | WGSL `vec3<f32>` uniform/storage buffer (16-byte aligned) | `unsafeVec3AddF32ManyStride16` |
+| Packed quaternion composition | `unsafeQuatMultiplyF32Many` only when inputs are already packed; on V8 it can be close to `quatMultiplyIntoMany`, so it is layout-driven rather than a guaranteed speed path |
 | Mat4 multiply, N pairs, packed `Float32Array` | `unsafeMat4MultiplyF32Many` only if measured to win; the scalar `mat4MultiplyInto` loop is faster on this run |
 
 Rules of thumb:

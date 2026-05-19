@@ -16,8 +16,13 @@ Already in place:
 - `world`: `CollisionWorld` orchestration over bodies and BVH.
 - `layout` / `data`: WGSL-compatible layout metadata and checked DataView
   projection.
-- `validation`: `Result`-first finite, range, float32-stability, non-empty, and
-  non-degenerate checks before measurement or serialization.
+- `validation`: `Result`-first finite, range, float32-stability, non-empty,
+  non-degenerate, and reproducibility seed/RNG/distribution checks before
+  measurement, serialization, or deterministic stress generation. Includes
+  `gaussian` / `triangular` distributions, `sampleDeterministicInt`,
+  `shuffleInPlace`, `sampleUnitDirection3Into` / `sampleInUnitBall3Into` /
+  `sampleInAabbInto`, `forkRng` named sub-streams, and bias diagnostics
+  (`summarizeSamples`, `validateUniformBias`).
 - `batch`: object-array `*IntoMany` kernels.
 - `gpu`: WebGPU projection and Float32Array bridge.
 - `unsafe`: explicit packed Float32Array and DataView helpers.

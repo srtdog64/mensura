@@ -54,6 +54,7 @@ import {
 
 const SAMPLES = 7;
 const WARMUP = 2;
+const CHECK_ROUNDS = 3;
 const VEC_ITERATIONS = 1_000_000;
 const MAT_ITERATIONS = 250_000;
 const GEOMETRY_ITERATIONS = 500_000;
@@ -946,8 +947,9 @@ console.log("");
 
 let currentGroup = "";
 let groupBaseline = 0;
+const results = cases.map(measure);
 
-for (const result of cases.map(measure)) {
+for (const result of results) {
   if (result.group !== currentGroup) {
     currentGroup = result.group;
     groupBaseline = result.opsPerSecond;
@@ -962,3 +964,211 @@ for (const result of cases.map(measure)) {
 }
 
 console.log(`\nchecksum: ${sink.toFixed(3)}`);
+
+if (process.argv.includes("--check")) {
+  checkPerformanceGates(results);
+}
+
+function checkPerformanceGates(initialResults) {
+  // Release-blocking gates intentionally target the APIs Mensura recommends for
+  // hot paths. Immutable helpers such as `add3` allocate inspectable objects;
+  // they are ergonomic surface, not a gl-matrix replacement claim.
+  //
+  // V8 benchmark ratios move with CPU scheduling, tier-up timing, and tiny
+  // kernel shape. The thresholds below are therefore relative gates, not
+  // absolute ops/sec promises:
+  // - direct `Into` APIs must stay competitive with gl-matrix, and the set must
+  //   contain concrete wins. Mensura keeps inspectable `{x,y,z}` objects, so it
+  //   should not claim every scalar kernel beats gl-matrix's typed arrays.
+  // - object batch APIs must beat the equivalent gl-matrix loop. Tiny/sqrt-heavy
+  //   object batches are not always faster than an inlined Mensura scalar loop
+  //   because V8 can inline that local loop aggressively; matrix batches that
+  //   hoist shared matrix reads must still show a real scalar-loop win.
+  // - unsafe gates cover only the documented packed-buffer fast cases. Packed
+  //   APIs that mainly exist for layout interop, or that fluctuate around the
+  //   object batch path in V8 (mat4 multiply, quat multiply), are intentionally
+  //   not release blockers.
+  const gates = [
+    {
+      name: "add3Into >= 0.90x gl-matrix vec3.add",
+      actual: "Mensura add3Into",
+      actualGroup: "vec3 add",
+      reference: "gl-matrix vec3.add",
+      referenceGroup: "vec3 add",
+      minRatio: 0.9,
+      competitive: true
+    },
+    {
+      name: "normalize3Into >= 0.90x gl-matrix vec3.normalize",
+      actual: "Mensura normalize3Into",
+      actualGroup: "vec3 normalize",
+      reference: "gl-matrix vec3.normalize",
+      referenceGroup: "vec3 normalize",
+      minRatio: 0.9,
+      competitive: true
+    },
+    {
+      name: "mat4MultiplyInto >= 0.90x gl-matrix mat4.multiply",
+      actual: "Mensura mat4MultiplyInto",
+      actualGroup: "mat4 multiply",
+      reference: "gl-matrix mat4.multiply",
+      referenceGroup: "mat4 multiply",
+      minRatio: 0.9,
+      competitive: true
+    },
+    {
+      name: "affinePoint3Into >= 0.90x gl-matrix vec3.transformMat4",
+      actual: "Mensura affinePoint3Into",
+      actualGroup: "mat4 transform",
+      reference: "gl-matrix vec3.transformMat4",
+      referenceGroup: "mat4 transform",
+      minRatio: 0.9,
+      competitive: true
+    },
+    {
+      name: "add3IntoMany >= 1.20x gl-matrix vec3.add loop",
+      actual: "Mensura add3IntoMany",
+      actualGroup: "vec3 add batch",
+      reference: "gl-matrix loop",
+      referenceGroup: "vec3 add batch",
+      minRatio: 1.2
+    },
+    {
+      name: "normalize3IntoMany >= 1.20x gl-matrix normalize loop",
+      actual: "Mensura normalize3IntoMany",
+      actualGroup: "vec3 normalize batch",
+      reference: "gl-matrix loop",
+      referenceGroup: "vec3 normalize batch",
+      minRatio: 1.2
+    },
+    {
+      name: "affinePoint3IntoMany >= 1.15x scalar affine loop",
+      actual: "Mensura affinePoint3IntoMany",
+      actualGroup: "mat4 affine transform batch",
+      reference: "scalar object loop (affinePoint3Into)",
+      referenceGroup: "mat4 affine transform batch",
+      minRatio: 1.15
+    },
+    {
+      name: "unsafeVec3AddF32Many >= 2.0x scalar add3Into loop",
+      actual: "unsafe vec3 F32 Many",
+      actualGroup: "vec3 add batch",
+      reference: "scalar object loop (add3Into)",
+      referenceGroup: "vec3 add batch",
+      minRatio: 2
+    },
+    {
+      name: "unsafeVec3DotF32Many >= 1.25x Mensura dot3IntoMany",
+      actual: "unsafe vec3 dot F32 Many",
+      actualGroup: "vec3 dot batch",
+      reference: "Mensura dot3IntoMany",
+      referenceGroup: "vec3 dot batch",
+      minRatio: 1.25
+    },
+    {
+      name: "unsafeVec3CrossF32Many >= 1.75x Mensura cross3IntoMany",
+      actual: "unsafe vec3 cross F32 Many",
+      actualGroup: "vec3 cross batch",
+      reference: "Mensura cross3IntoMany",
+      referenceGroup: "vec3 cross batch",
+      minRatio: 1.75
+    },
+    {
+      name: "unsafeVec3ScaleAndAddF32Many >= 1.75x Mensura scaleAndAdd3IntoMany",
+      actual: "unsafe vec3 scaleAndAdd F32 Many",
+      actualGroup: "vec3 scaleAndAdd batch",
+      reference: "Mensura scaleAndAdd3IntoMany",
+      referenceGroup: "vec3 scaleAndAdd batch",
+      minRatio: 1.75
+    },
+    {
+      name: "transformPoint3IntoMany >= 1.00x gl-matrix transform loop",
+      actual: "Mensura transformPoint3IntoMany",
+      actualGroup: "mat4 transform batch (perspective)",
+      reference: "gl-matrix loop",
+      referenceGroup: "mat4 transform batch (perspective)",
+      minRatio: 1
+    }
+  ];
+
+  const rounds = [initialResults];
+  while (rounds.length < CHECK_ROUNDS) {
+    rounds.push(cases.map(measure));
+  }
+
+  const failures = [];
+  let competitiveWins = 0;
+  console.log(`\nPerformance gates (${CHECK_ROUNDS}-round median ratios)`);
+  console.log("-------------------------------------------");
+
+  for (const gate of gates) {
+    const ratios = rounds.map((round) => gateRatio(round, gate)).filter((value) => value !== undefined);
+    if (ratios.length !== CHECK_ROUNDS) {
+      failures.push(`${gate.name}: missing benchmark case`);
+      console.log(`${gate.name.padEnd(76)} MISSING`);
+      continue;
+    }
+
+    ratios.sort((a, b) => a - b);
+    const ratio = ratios[Math.floor(ratios.length / 2)];
+    const passed = ratio >= gate.minRatio;
+    console.log(
+      `${gate.name.padEnd(76)} ${ratio.toFixed(2)}x >= ${gate.minRatio.toFixed(2)}x ${passed ? "PASS" : "FAIL"}`
+    );
+
+    if (!passed) {
+      failures.push(`${gate.name}: median ${ratio.toFixed(2)}x < ${gate.minRatio.toFixed(2)}x`);
+    }
+
+    if (gate.competitive === true && ratio > 1) {
+      competitiveWins += 1;
+    }
+  }
+
+  if (competitiveWins < 2) {
+    failures.push(`direct Into APIs need at least 2 gl-matrix wins; got ${competitiveWins}`);
+  }
+
+  if (failures.length > 0) {
+    console.error("\nPerformance gate failed:");
+    for (const failure of failures) {
+      console.error(`- ${failure}`);
+    }
+    process.exitCode = 1;
+  }
+}
+
+function gateRatio(results, gate) {
+  const byGroupAndName = new Map(results.map((result) => [`${result.group}\0${result.name}`, result]));
+  const byName = new Map();
+  for (const result of results) {
+    if (!byName.has(result.name)) {
+      byName.set(result.name, []);
+    }
+    byName.get(result.name).push(result);
+  }
+
+  const actual = lookupResult(gate.actual, gate.actualGroup, byName, byGroupAndName);
+  const reference = lookupResult(gate.reference, gate.referenceGroup ?? actual?.group, byName, byGroupAndName);
+  if (!actual || !reference) {
+    return undefined;
+  }
+  return actual.opsPerSecond / reference.opsPerSecond;
+}
+
+function lookupResult(name, group, byName, byGroupAndName) {
+  if (group) {
+    return byGroupAndName.get(`${group}\0${name}`);
+  }
+
+  const matches = byName.get(name);
+  if (!matches || matches.length === 0) {
+    return undefined;
+  }
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  return undefined;
+}

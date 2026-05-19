@@ -126,6 +126,8 @@
     "dist",
     "docs",
     "README.md",
+    "CONTRIBUTING.md",
+    "DCO.md",
     "LICENSE"
   ],
   "keywords": [
@@ -149,8 +151,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "benchmark": "npm run build && node benchmark-runner.js",
+    "benchmark:check": "npm run build && node benchmark-runner.js --check",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('tsconfig.tsbuildinfo',{force:true});\"",
     "check": "npm run build && npm test && npm run pack:check",
+    "check:release": "npm run dco:check && npm run check && npm run benchmark:check",
+    "dco:check": "node scripts/dco-check.mjs",
     "pack:check": "npm pack --dry-run",
     "prebuild": "npm run clean",
     "prepack": "npm run build",
