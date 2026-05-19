@@ -12,8 +12,10 @@ Already in place:
 - `geometry`: ray, plane, AABB, sphere, OBB, capsule, frustum, triangle mesh.
 - `query`: ray hit data, ray/plane/AABB/sphere/triangle tests, frustum tests.
 - `collision`: SAT, GJK, EPA with caller-owned `CollisionContext`.
-- `accel`: BVH with caller-owned `AccelContext`.
-- `world`: `CollisionWorld` orchestration over bodies and BVH.
+- `accel`: median and SAH BVH builders with caller-owned `AccelContext`, ray
+  traversal, and broadphase overlap pair generation.
+- `world`: `CollisionWorld` orchestration over bodies, BVH, raycast, and
+  broadphase pairs.
 - `layout` / `data`: WGSL-compatible layout metadata and checked DataView
   projection.
 - `validation`: `Result`-first finite, range, float32-stability, non-empty,
@@ -26,13 +28,27 @@ Already in place:
 - `batch`: object-array `*IntoMany` kernels.
 - `gpu`: WebGPU projection and Float32Array bridge.
 - `unsafe`: explicit packed Float32Array and DataView helpers.
+- `wasm`: WebAssembly SIMD feature probing. Actual SIMD kernels remain
+  deferred until a workload proves the JS unsafe kernel is the bottleneck.
 - Verification gates: `npm run check`, `npm run benchmark`,
-  `npm pack --dry-run`.
+  `npm pack --dry-run`, `npm run check:contracts`, and
+  `npm run check:release`.
+- Release hardening has started: golden fixtures, deterministic fuzz
+  invariants, experimental-module build output (`dist-experimental/`, ignored),
+  package export plus `dist/*.d.ts` symbol snapshot, packaged
+  bundler-resolution smoke checks, Vite browser bundle smoke checks, and a
+  longer deterministic fuzz corpus.
 
 ## P0: API Freeze Prep
 
 - Maintain `docs/api-stability.md` as the source of truth for stable 0.1,
   experimental, compatibility, and unsafe surfaces.
+- Treat `test/golden/api-surface.json` as an intentional-change gate. It pins
+  package exports and generated `.d.ts` symbols, so public API drift should be
+  reviewed before running `npm run api:snapshot:write`.
+- Keep `packages/bundler-smoke` and `packages/browser-smoke` package-shaped.
+  They are release checks, not published packages; generated output belongs in
+  `.mensura-smoke/`.
 - Keep naming consistent:
   - `Into` means caller-owned single output.
   - `IntoMany` means object-array batch.
@@ -51,13 +67,45 @@ Collision is the least mature public area. Before calling it public-ready:
   covered.
 - EPA: degenerate simplex Result is covered, plus a successful penetration
   recovery witness from a real GJK simplex.
+- CCD: `sweptAabbTimeOfImpact` and `sweptSphereTimeOfImpact` cover linear
+  time-of-impact for common tunneling cases.
+- MPR: `mprIntersect` exposes the support-map plus interior-point API shape
+  needed by MPR, performs the first portal-ray rejection, and resolves the
+  current result through the context-owned GJK core until full portal
+  refinement is justified by more witness coverage.
 - GJK hot path no longer allocates per call: `CollisionContext` now owns the
   simplex pool, the initial direction, and the working direction. `GjkResult`
   exposes `simplex` and `simplexSize` as a view into the context (valid until
   the next `gjk` call). `epa(simplex, simplexSize, ...)` takes the explicit
   size so it never slices.
-- Remaining: a deterministic non-converging EPA witness; a wider sweep over
-  randomized OBB pairs.
+- Deterministic non-converging EPA witness lands by calling `epa` with
+  `maxIterations = 0` against a real GJK 4-simplex, so the loop never enters
+  and the function falls through to `EPA_MAX_ITERATIONS`.
+- Randomized OBB pair sweep (`test/physics.test.ts`) generates 80 OBB pairs
+  with a deterministic seed, runs both SAT and GJK, and requires agreement
+  within a 5% boundary-noise budget (SAT skips near-parallel cross axes and
+  GJK uses strict-positive support, so a small disagreement rate is
+  documented and expected).
+
+## P1.5: Shape Pair Coverage
+
+Filled the previously empty cells in the shape-pair matrix:
+
+- OBB now exposes predicates and measurements:
+  `obbContainsPoint`, `obbClosestPoint(/Into)`, `obbGetAabb(/Into)`,
+  `obbGetCorners(/Into)`.
+- Sphere measurements: `sphereGetAabb(/Into)`, `sphereSurfaceArea`,
+  `sphereVolume`.
+- Plane vs shape: `planeIntersectsSphere`, `planeIntersectsAabb`.
+- Ray vs OBB / Capsule: `rayObbHit(Distance)`, `rayIntersectsObb`,
+  `rayCapsuleHit(Distance)`, `rayIntersectsCapsule`.
+- Frustum vs OBB / Capsule: `frustumIntersectsObb`,
+  `frustumIntersectsCapsule`.
+- Validation: `validateRay`, `validateMat4` (finite + optional singular
+  determinant), `validateObb` (extents non-negative, optional orthonormal
+  rotation), `validateFrustum` (six plane validation).
+- `CollisionWorld.updateBody(id, aabb)` plus `hasBody` / `bodyCount`
+  conveniences. BVH is invalidated lazily; the next `updateBvh` rebuilds.
 
 ## P2: Geometry Breadth
 
@@ -97,15 +145,15 @@ Collision is the least mature public area. Before calling it public-ready:
 - Shipped additions: `unsafeVec3MinF32Many`, `unsafeVec3MaxF32Many`,
   `unsafeAabbExpandByPointF32Many` (mutates a stride-6 box buffer in place).
 - Optional follow-up: `unsafeMat4ComposeTrsF32Many` only if measured useful.
-- Defer WebAssembly/SIMD mat4 multiply for now.
+- WebAssembly/SIMD mat4 multiply kernel is still deferred.
   - Current `unsafeMat4MultiplyF32Many` is competitive with the scalar object
     loop and already beats the measured gl-matrix loop.
   - WASM only makes sense after a real workload shows repeated batches around
     N >= 512 where matrix multiply is the bottleneck.
-  - Do not add WASM to the root or normal unsafe surface. If this is revived,
-    create an explicit `wasm` or `unsafe/wasm` layer with documented
-    `WebAssembly.Memory` ownership, fallback behavior, generation steps, and
-    checksum/provenance for the shipped binary.
+  - `@exornea/mensura/wasm` now exists only as a feature-probe layer. Do not
+    ship a binary kernel there without documented `WebAssembly.Memory`
+    ownership, fallback behavior, generation steps, and checksum/provenance
+    for the shipped binary.
 
 ## P4: Compiler And Worker Integration
 

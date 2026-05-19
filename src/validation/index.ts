@@ -1,5 +1,6 @@
 import type { Float32ConversionLoss } from "../core/float.js";
 import { DEFAULT_FLOAT_TOLERANCE, conversionLossF32 } from "../core/float.js";
+import type { Mat4Like } from "../core/mat4.js";
 import type { MensuraError, Result } from "../core/result.js";
 import { err, ok } from "../core/result.js";
 import type { Vec3 } from "../core/vec3.js";
@@ -7,7 +8,10 @@ import { lengthSq3 } from "../core/vec3.js";
 import type { Aabb } from "../geometry/aabb.js";
 import { aabbIsEmpty } from "../geometry/aabb.js";
 import type { Capsule } from "../geometry/capsule.js";
+import type { Frustum } from "../geometry/frustum.js";
+import type { Obb } from "../geometry/obb.js";
 import type { Plane } from "../geometry/plane.js";
+import type { Ray } from "../geometry/ray.js";
 import type { Sphere } from "../geometry/sphere.js";
 import { triangleDoubleArea } from "../measure/triangle.js";
 
@@ -209,6 +213,180 @@ export function validatePlane(value: Plane, options: PlaneValidationOptions = {}
     });
   }
 
+  return ok(value);
+}
+
+export interface RayValidationOptions extends ValidationOptions {
+  readonly minDirectionLengthSq?: number;
+}
+
+export function validateRay(value: Ray, options: RayValidationOptions = {}): Result<Ray> {
+  const origin = validateFiniteVec3(value.origin, withLabel(options, `${label(options)}.origin`));
+  if (!origin.ok) {
+    return origin;
+  }
+
+  const direction = validateFiniteVec3(value.direction, withLabel(options, `${label(options)}.direction`));
+  if (!direction.ok) {
+    return direction;
+  }
+
+  const minDirectionLengthSq = options.minDirectionLengthSq ?? 1e-24;
+  const lengthSq = lengthSq3(value.direction);
+  if (lengthSq < minDirectionLengthSq) {
+    return validationError("VALIDATION_DEGENERATE_RAY", `${label(options)} direction is degenerate`, options, {
+      lengthSq,
+      minDirectionLengthSq
+    });
+  }
+
+  return ok(value);
+}
+
+export interface Mat4ValidationOptions extends ValidationOptions {
+  readonly requireFiniteDeterminant?: boolean;
+  readonly minAbsDeterminant?: number;
+}
+
+export function validateMat4(value: Mat4Like, options: Mat4ValidationOptions = {}): Result<Mat4Like> {
+  for (let i = 0; i < 16; i++) {
+    if (!Number.isFinite(value[i])) {
+      return validationError("VALIDATION_MAT4_NON_FINITE", `${label(options)}[${i}] must be finite`, options, {
+        index: i,
+        value: value[i]
+      });
+    }
+  }
+
+  if (options.requireFiniteDeterminant === true) {
+    // 4x4 determinant via co-factor expansion. Avoids importing core/mat4 to
+    // keep the validation layer self-contained.
+    const det = mat4DeterminantInline(value);
+    const minAbs = options.minAbsDeterminant ?? 1e-12;
+    if (!Number.isFinite(det) || Math.abs(det) < minAbs) {
+      return validationError(
+        "VALIDATION_MAT4_SINGULAR",
+        `${label(options)} determinant is below the singular threshold`,
+        options,
+        { determinant: det, minAbsDeterminant: minAbs }
+      );
+    }
+  }
+
+  return ok(value);
+}
+
+function mat4DeterminantInline(m: Mat4Like): number {
+  const m00 = m[0], m10 = m[1], m20 = m[2], m30 = m[3];
+  const m01 = m[4], m11 = m[5], m21 = m[6], m31 = m[7];
+  const m02 = m[8], m12 = m[9], m22 = m[10], m32 = m[11];
+  const m03 = m[12], m13 = m[13], m23 = m[14], m33 = m[15];
+
+  return (
+    m00 * (
+      m11 * (m22 * m33 - m23 * m32) -
+      m12 * (m21 * m33 - m23 * m31) +
+      m13 * (m21 * m32 - m22 * m31)
+    ) -
+    m10 * (
+      m01 * (m22 * m33 - m23 * m32) -
+      m02 * (m21 * m33 - m23 * m31) +
+      m03 * (m21 * m32 - m22 * m31)
+    ) +
+    m20 * (
+      m01 * (m12 * m33 - m13 * m32) -
+      m02 * (m11 * m33 - m13 * m31) +
+      m03 * (m11 * m32 - m12 * m31)
+    ) -
+    m30 * (
+      m01 * (m12 * m23 - m13 * m22) -
+      m02 * (m11 * m23 - m13 * m21) +
+      m03 * (m11 * m22 - m12 * m21)
+    )
+  );
+}
+
+export interface ObbValidationOptions extends ValidationOptions {
+  /** Tolerance for column orthonormality, dot product and length comparisons. */
+  readonly orthonormalEpsilon?: number;
+  /** When true, also check that rotation columns are orthonormal. Default false. */
+  readonly requireOrthonormalRotation?: boolean;
+}
+
+export function validateObb(value: Obb, options: ObbValidationOptions = {}): Result<Obb> {
+  const center = validateFiniteVec3(value.center, withLabel(options, `${label(options)}.center`));
+  if (!center.ok) {
+    return center;
+  }
+
+  const extents = validateFiniteVec3(value.extents, withLabel(options, `${label(options)}.extents`));
+  if (!extents.ok) {
+    return extents;
+  }
+
+  if (value.extents.x < 0 || value.extents.y < 0 || value.extents.z < 0) {
+    return validationError("VALIDATION_OBB_NEGATIVE_EXTENTS", `${label(options)} extents must be non-negative`, options, {
+      extents: { x: value.extents.x, y: value.extents.y, z: value.extents.z }
+    });
+  }
+
+  for (let i = 0; i < 9; i++) {
+    if (!Number.isFinite(value.rotation[i])) {
+      return validationError(
+        "VALIDATION_OBB_ROTATION_NON_FINITE",
+        `${label(options)} rotation[${i}] must be finite`,
+        options,
+        { index: i, value: value.rotation[i] }
+      );
+    }
+  }
+
+  if (options.requireOrthonormalRotation === true) {
+    const eps = options.orthonormalEpsilon ?? 1e-5;
+    const r = value.rotation;
+    // Columns of column-major mat3: c0 = r[0..2], c1 = r[3..5], c2 = r[6..8].
+    const c0Sq = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+    const c1Sq = r[3] * r[3] + r[4] * r[4] + r[5] * r[5];
+    const c2Sq = r[6] * r[6] + r[7] * r[7] + r[8] * r[8];
+    const c0c1 = r[0] * r[3] + r[1] * r[4] + r[2] * r[5];
+    const c0c2 = r[0] * r[6] + r[1] * r[7] + r[2] * r[8];
+    const c1c2 = r[3] * r[6] + r[4] * r[7] + r[5] * r[8];
+    if (
+      Math.abs(c0Sq - 1) > eps ||
+      Math.abs(c1Sq - 1) > eps ||
+      Math.abs(c2Sq - 1) > eps ||
+      Math.abs(c0c1) > eps ||
+      Math.abs(c0c2) > eps ||
+      Math.abs(c1c2) > eps
+    ) {
+      return validationError(
+        "VALIDATION_OBB_NON_ORTHONORMAL",
+        `${label(options)} rotation columns are not orthonormal within epsilon`,
+        options,
+        { c0Sq, c1Sq, c2Sq, c0c1, c0c2, c1c2, epsilon: eps }
+      );
+    }
+  }
+
+  return ok(value);
+}
+
+export function validateFrustum(value: Frustum, options: ValidationOptions = {}): Result<Frustum> {
+  const planes: readonly [string, Plane][] = [
+    ["left", value.left],
+    ["right", value.right],
+    ["bottom", value.bottom],
+    ["top", value.top],
+    ["far", value.far],
+    ["near", value.near]
+  ];
+  for (let i = 0; i < planes.length; i++) {
+    const [name, p] = planes[i];
+    const result = validatePlane(p, withLabel(options, `${label(options)}.${name}`));
+    if (!result.ok) {
+      return result;
+    }
+  }
   return ok(value);
 }
 

@@ -1,4 +1,6 @@
 import type { Aabb } from "./aabb.js";
+import type { Capsule } from "./capsule.js";
+import type { Obb } from "./obb.js";
 import { type MutablePlane, type Plane, mutablePlane, planeDistanceToPoint, planeFromComponentsInto } from "./plane.js";
 import type { Sphere } from "./sphere.js";
 import type { Mat4Like } from "../core/mat4.js";
@@ -108,4 +110,76 @@ function aabbHasPositiveVertexInsidePlane(box: Aabb, testPlane: Plane): boolean 
   const pz = nz > 0 ? box.max.z : box.min.z;
 
   return nx * px + ny * py + nz * pz + testPlane.constant >= 0;
+}
+
+/**
+ * OBB vs frustum culling. For each plane, project the OBB's half-extents onto
+ * the plane normal:
+ *
+ *   r = ex · |n · localX| + ey · |n · localY| + ez · |n · localZ|
+ *
+ * where `localI` are the OBB's local axes in world space (columns of
+ * `rotation`). The OBB is outside the plane when the signed distance from
+ * the center is less than `-r`. If no plane fully rejects, the OBB
+ * potentially intersects.
+ *
+ * Same false-positive risk as `frustumIntersectsAabb` near the frustum
+ * corners — exact test would need 15-axis SAT against the frustum hull.
+ */
+export function frustumIntersectsObb(value: Frustum, box: Obb): boolean {
+  return (
+    obbProjectionInsidePlane(box, value.left) &&
+    obbProjectionInsidePlane(box, value.right) &&
+    obbProjectionInsidePlane(box, value.bottom) &&
+    obbProjectionInsidePlane(box, value.top) &&
+    obbProjectionInsidePlane(box, value.far) &&
+    obbProjectionInsidePlane(box, value.near)
+  );
+}
+
+function obbProjectionInsidePlane(box: Obb, testPlane: Plane): boolean {
+  const nx = testPlane.normal.x;
+  const ny = testPlane.normal.y;
+  const nz = testPlane.normal.z;
+  const r = box.rotation;
+  const ex = box.extents.x;
+  const ey = box.extents.y;
+  const ez = box.extents.z;
+  // |n · localAxis_j| · extent_j, where localAxis_j is column j of rotation.
+  const projX = Math.abs(nx * r[0] + ny * r[1] + nz * r[2]) * ex;
+  const projY = Math.abs(nx * r[3] + ny * r[4] + nz * r[5]) * ey;
+  const projZ = Math.abs(nx * r[6] + ny * r[7] + nz * r[8]) * ez;
+  const projectedHalf = projX + projY + projZ;
+  const centerDistance = nx * box.center.x + ny * box.center.y + nz * box.center.z + testPlane.constant;
+  return centerDistance >= -projectedHalf;
+}
+
+/**
+ * Capsule vs frustum culling. The capsule is rejected by a plane when both
+ * endpoints lie further than the radius on the negative side. A capsule that
+ * passes every plane test is potentially inside the frustum (the usual
+ * conservative culling caveat for plane-AND tests applies).
+ *
+ * Negative capsule radius behaves like an empty sphere — never inside.
+ */
+export function frustumIntersectsCapsule(value: Frustum, capsule: Capsule): boolean {
+  if (capsule.radius < 0) {
+    return false;
+  }
+  return (
+    capsuleInsidePlane(capsule, value.left) &&
+    capsuleInsidePlane(capsule, value.right) &&
+    capsuleInsidePlane(capsule, value.bottom) &&
+    capsuleInsidePlane(capsule, value.top) &&
+    capsuleInsidePlane(capsule, value.far) &&
+    capsuleInsidePlane(capsule, value.near)
+  );
+}
+
+function capsuleInsidePlane(capsule: Capsule, testPlane: Plane): boolean {
+  const d0 = planeDistanceToPoint(testPlane, capsule.point0);
+  const d1 = planeDistanceToPoint(testPlane, capsule.point1);
+  // The closer endpoint determines the capsule's projection on the plane normal.
+  const closer = d0 < d1 ? d0 : d1;
+  return closer >= -capsule.radius;
 }

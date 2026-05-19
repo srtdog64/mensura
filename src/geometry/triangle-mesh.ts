@@ -9,18 +9,18 @@ export function triangleMesh(
   indices?: Uint16Array | Uint32Array,
   vertexStride: number = 3
 ): TriangleMesh {
-  if (indices) {
-    return {
+  if (indices !== undefined) {
+    return Object.freeze({
       vertices,
       indices,
       vertexStride
-    };
+    });
+  } else {
+    return Object.freeze({
+      vertices,
+      vertexStride
+    }) as TriangleMesh;
   }
-
-  return {
-    vertices,
-    vertexStride
-  };
 }
 
 export function triangleMeshGetVertexCount(mesh: TriangleMesh): number {

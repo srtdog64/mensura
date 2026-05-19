@@ -67,15 +67,20 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/physics   compatibility facade for accel/collision/world
 @exornea/mensura/gpu       WebGPU projection and packed Float32Array bridges
 @exornea/mensura/unsafe    unchecked binary and typed-array projection helpers
+@exornea/mensura/wasm      WebAssembly feature probes for optional kernels
 ```
 
 For `0.1.x`, `core`, `geometry`, `query`, `measure`, `validation`, `gpu`,
 `layout`, `data`, and `batch` are the stable release surface. `collision`,
 `accel`, and `world` are experimental dogfood layers. `physics` is a
-compatibility facade. `unsafe` is explicitly unsafe and opt-in.
+compatibility facade. `wasm` is an experimental feature-probe layer. `unsafe`
+is explicitly unsafe and opt-in.
 
 See [API Stability](docs/api-stability.md) for the release contract.
 See [API Guide](docs/api-guide.md) for layer-by-layer usage notes.
+See [Math Theory](docs/math-theory.md) for the formulas behind float32 loss,
+empty-domain sentinels, RNG algorithms, sampling distributions, geometric
+samplers, and bias diagnostics.
 
 The root facade exports the primary layers. `physics` remains as a compatibility
 facade for older imports, but new code should import `query`, `collision`,
@@ -174,6 +179,11 @@ npm run check:release
 This runs build, tests, `npm pack --dry-run`, and the benchmark threshold gate.
 If a release-blocking hot path falls below its relative performance floor, the
 command fails.
+
+The release gate also runs DCO validation, the experimental-module build,
+the API surface snapshot, the `dist/*.d.ts` symbol snapshot, the packaged
+bundler-resolution smoke test, and a Vite browser bundle smoke test. Generated
+experimental and smoke outputs live in ignored folders.
 
 ## Contributions
 

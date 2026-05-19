@@ -213,6 +213,8 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 - predicates: `sphereContainsPoint`, `sphereIntersectsSphere`,
   `sphereIntersectsAabb`. All guard `radius < 0` → `false` (empty sphere
   overlaps nothing).
+- measurements: `sphereGetAabb(/Into)` (empty sphere → empty AABB),
+  `sphereSurfaceArea`, `sphereVolume`. Re-exported by `measure`.
 
 ### `plane.ts`
 
@@ -220,6 +222,8 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
   `planeFromComponents(x, y, z, c, /Into)` (auto-normalizes).
 - measurement: `planeNormalize`/`Into` (scales normal and constant
   together), `planeDistanceToPoint(plane, p)`.
+- intersect: `planeIntersectsSphere`, `planeIntersectsAabb`
+  (projected-extent vs signed distance test). Re-exported by `query`.
 
 ### `ray.ts`
 
@@ -233,6 +237,12 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
     negative radius misses.
   - `rayTriangleHit` / `rayTriangleHitDistance` — Möller–Trumbore with a
     `frontFace` flag.
+  - `rayObbHit` / `rayObbHitDistance` / `rayIntersectsObb` — transform ray
+    into OBB local frame, run slab test against `[-extents, +extents]`.
+  - `rayCapsuleHit` / `rayCapsuleHitDistance` / `rayIntersectsCapsule` —
+    infinite-cylinder intersection clipped to segment extent, plus
+    hemispherical end caps; collapses to a sphere when the segment is
+    degenerate.
 
 `*Hit` variants return data or `null`; `*Intersects*` returns boolean only.
 
@@ -242,6 +252,12 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 
 - ctor / copy: `obb(center, extents, rotation)`, `mutableObb(...)`,
   `copyObb`/`Into`.
+- predicate: `obbContainsPoint` — transform point into local frame and
+  compare `|local|` to `extents`. Re-exported by `query`.
+- measurements: `obbClosestPoint`/`Into` (clamp in local frame, transform
+  back), `obbGetAabb`/`Into` (world AABB via projected half-extents),
+  `obbGetCorners`/`Into` (8 corners, sign order
+  `(-x,-y,-z), (+x,-y,-z), …`). Re-exported by `measure`.
 - OBB-OBB overlap is in `@exornea/mensura/collision` (`testObbObbSat`).
 
 ### `capsule.ts`
@@ -259,7 +275,10 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 - ctor: `mutableFrustum()`, `frustumFromMatrixWebGpu`/`Into` — six-plane
   extraction for the WebGPU `0..1` NDC convention.
 - predicates: `frustumContainsPoint`, `frustumIntersectsSphere`,
-  `frustumIntersectsAabb` — culling fast-paths.
+  `frustumIntersectsAabb`, `frustumIntersectsObb` (projected half-extent
+  per local axis), `frustumIntersectsCapsule` (segment endpoint closer
+  distance vs radius). Same plane-AND conservative-culling caveat as the
+  AABB variant — false positives near frustum corners are possible.
 
 ### `triangle-mesh.ts`
 
@@ -338,7 +357,8 @@ The **closest point on the empty set is not a value** — no element exists to
 choose. The raw `aabbClosestPoint` still returns a `MutableVec3` (whatever
 `clamp3` produces on an inverted box), so callers that may encounter empty
 inputs should either pre-guard with `aabbIsEmpty` or use the checked entry
-in `measure/checked`.
+in `measure/checked`. See [math-theory.md](math-theory.md) §2 for the
+empty-domain conventions.
 
 > 공집합과의 거리는 `+∞` (정의에 따라 inf(∅) = +∞). 공집합 위의 가장 가까운
 > 점은 값 자체가 존재하지 않음 — 이 경우는 `measure/checked`로.
@@ -436,6 +456,16 @@ Functions:
 - Triangle: `validateTriangle(a, b, c, { minDoubleArea? }) →
   Result<TriangleValidation>` where `TriangleValidation = { doubleArea,
   area }` so the caller can reuse the area downstream without recomputing.
+- Ray: `validateRay(value, { minDirectionLengthSq? })` — finite
+  origin/direction plus non-zero direction (`VALIDATION_DEGENERATE_RAY`).
+- Mat4: `validateMat4(value, { requireFiniteDeterminant?,
+  minAbsDeterminant? })` — `VALIDATION_MAT4_NON_FINITE` for any non-finite
+  entry, optional `VALIDATION_MAT4_SINGULAR` against a tolerance.
+- OBB: `validateObb(value, { requireOrthonormalRotation?,
+  orthonormalEpsilon? })` — finite components, non-negative extents,
+  optional `VALIDATION_OBB_NON_ORTHONORMAL` check.
+- Frustum: `validateFrustum(value)` — runs `validatePlane` on each of the
+  six planes.
 - Reproducibility:
   - `validateSeed(seed, options?) → Result<number>` — accepts finite uint32
     integer seeds.
@@ -491,7 +521,10 @@ Functions:
 
   Reproducibility is for stress tests, fixtures, generated benchmark
   inputs, and asset validation replay. It is not a security or
-  gameplay-randomness primitive.
+  gameplay-randomness primitive. See
+  [math-theory.md](math-theory.md) for the formulas — RNG algorithms,
+  inverse-CDF derivations, Marsaglia / `u^(1/3)` geometric samplers,
+  Welford variance, and the histogram bias test.
 
 Use this layer when geometry crosses a trust boundary (asset load, user
 input, RPC body). Inside the hot path, prefer the raw `measure` / `query`
@@ -560,10 +593,14 @@ per concurrent caller (worker, async pipeline).
 ### `collision-world.ts`
 
 - `CollisionBody` interface.
-- `CollisionWorld` class — body lifecycle, BVH rebuild, raycast. Owns its
-  own `AccelContext` internally; a single-threaded caller does not need to
-  manage one. Worker isolation is still the caller's responsibility (one
-  world per worker).
+- `CollisionWorld` class — body lifecycle, BVH rebuild, raycast.
+  - `addBody(aabb) → id`, `removeBody(id) → boolean`,
+    `updateBody(id, aabb) → boolean` (replaces the AABB and invalidates the
+    cached BVH; next `updateBvh()` rebuilds), `hasBody(id) → boolean`,
+    `bodyCount() → number`.
+  - Owns its own `AccelContext` internally; a single-threaded caller does
+    not need to manage one. Worker isolation is still the caller's
+    responsibility (one world per worker).
 
 > 단일 스레드면 ctx 자동 관리. 워커 분리는 호출자 책임.
 

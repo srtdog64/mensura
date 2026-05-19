@@ -41,9 +41,26 @@ These layers are public enough to dogfood, but not yet stable enough to freeze:
 | `@exornea/mensura/accel` | Experimental | BVH behavior is tested, but builder policy and traversal result contracts may still change. |
 | `@exornea/mensura/world` | Experimental | Useful orchestration layer, but body lifecycle and broadphase ownership are not finalized. |
 | `@exornea/mensura/physics` | Compatibility | Re-export facade for older imports. Do not add new primary APIs here. |
+| `@exornea/mensura/wasm` | Experimental | Feature-probe layer for WebAssembly SIMD. No binary kernel is shipped until memory ownership, fallback behavior, generation steps, and provenance are documented. |
 
 Experimental APIs should remain tested, but callers should expect naming,
 result-shape, and policy changes before a stable release.
+
+## Contract Gates
+
+API drift is checked from the built package, not from source intent:
+
+- `test/golden/api-surface.json` pins package exports and generated
+  `dist/*.d.ts` symbols.
+- `npm run api:snapshot` fails when a public subpath or declaration symbol
+  changes without an intentional snapshot update.
+- `packages/bundler-smoke` checks package-style imports under TypeScript's
+  `moduleResolution: "Bundler"`.
+- `packages/browser-smoke` runs a Vite production browser bundle against the
+  built `dist` files and writes only to ignored `.mensura-smoke/` output.
+
+When a public API change is intentional, update docs and then run
+`npm run api:snapshot:write` in the same patch.
 
 ## Unsafe Surface
 

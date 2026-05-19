@@ -9,6 +9,13 @@ This report analyzes the current state of the Mensura library and provides perfo
 - Core mathematical types: `vec3`, `vec4`, `mat3`, `mat4`, quaternions
 - Geometry primitives: `ray`, `plane`, `aabb`, `sphere`, `frustum`
 - GPU interface: `Float32Array` and `DataView` adapters
+- Batch operations: Optimized functions for processing arrays of values
+- Unsafe operations: Direct memory manipulation functions
+- **Experimental modules**:
+  - `accel`: Acceleration structures (BVH - Bounding Volume Hierarchy)
+  - `collision`: Collision detection algorithms (GJK, EPA, SAT)
+  - `physics`: Physics simulation utilities
+  - `world`: World-level physics and collision management
 - Export structure: modular design with core, geometry, and gpu components
 
 ### Library Characteristics
@@ -48,26 +55,28 @@ Based on the benchmark results from the built-in Mensura benchmark:
 - Consider adding more `Into` variants for commonly used functions
 - Implement SIMD optimizations where applicable
 
-### 3. Experimental Physics Module
-- The physics module (gjk.ts, bvh.ts, etc.) currently has compilation issues
-- These modules need to follow the immutable-by-default pattern with `Into` variants
-- Consider moving experimental modules to a separate package or development branch
+### 3. Experimental Modules Management
+- The experimental modules (accel, collision, physics, world) are now properly compiled separately
+- These modules can be developed and tested independently
+- They are published as submodules but marked as experimental
+- Keep experimental modules isolated to maintain stable main library
 
 ### 4. Type Safety vs Performance
 - The `exactOptionalPropertyTypes: true` setting caught a legitimate issue in `triangle-mesh.ts`
 - This strictness improves code quality at the cost of some API convenience
 - The fix maintains type safety while preserving the intended functionality
 
-## Compilation Issues Resolved
+## Compilation and Build Process
 
-### Fixed `triangle-mesh.ts`
-- Corrected type definition to satisfy `exactOptionalPropertyTypes`
-- Maintained the same functionality with proper TypeScript compliance
+### Standard Build
+- Main library: `npm run build` (compiles stable modules)
+- Output: `./dist` directory
 
-### Removed Physics from Main Export
-- Physics modules were causing compilation errors
-- Removed from main export to maintain stable build
-- Physics modules can be developed separately and integrated when ready
+### Experimental Build
+- Experimental modules: `npm run build:experimental` (compiles experimental modules)
+- Output: `./dist-experimental` directory
+- Dependencies: Includes core and geometry modules to resolve dependencies
+- Combined build: `npm run build:all`
 
 ## Performance Best Practices
 
@@ -75,11 +84,11 @@ Based on the benchmark results, the following best practices emerge:
 
 1. **Use Into Variants**: When performing many calculations in loops, use `Into` variants for significant performance gains
 2. **Object Pooling**: For frequently allocated temporary objects, consider reusing instances
-3. **Batch Operations**: Group similar operations to maximize cache efficiency
+3. **Batch Operations**: Use batch functions for processing arrays of similar data
 4. **Minimize Allocation**: Reduce garbage collection pressure by reusing objects where possible
 
 ## Conclusion
 
 Mensura is well-designed for performance with its dual approach of immutable defaults and mutable `Into` variants. The benchmarks confirm that the `Into` variants offer substantial performance improvements in performance-sensitive contexts. The library's strict type safety catches real issues while maintaining high performance.
 
-The main recommendation is to continue emphasizing the `Into` pattern for hot paths while keeping the immutable API for general use cases. The modular architecture allows for targeted optimizations without affecting the overall stability of the library.
+The main recommendation is to continue emphasizing the `Into` pattern for hot paths while keeping the immutable API for general use cases. The modular architecture allows for targeted optimizations without affecting the overall stability of the library. Experimental modules should remain isolated until they are production-ready.

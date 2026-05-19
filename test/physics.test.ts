@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
+import type { Vec3 } from "../src/core/index.js";
 import { MAT3_IDENTITY, mat3, normalize3, scaleAndAdd3, vec3 } from "../src/core/index.js";
+import type { Obb } from "../src/geometry/index.js";
 import { aabb, obb, ray } from "../src/geometry/index.js";
 import { AccelContext, buildBvh, bvhRaycast } from "../src/accel/index.js";
 import { epa, gjk, testObbObbSat, CollisionContext } from "../src/collision/index.js";
 import { CollisionWorld } from "../src/world/index.js";
+import {
+  createDeterministicRng,
+  sampleDeterministicUnit,
+  seedFromString
+} from "../src/validation/index.js";
 
 function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
   return (direction: ReturnType<typeof vec3>) => {
@@ -29,6 +36,27 @@ function rotationYMat3(radians: number) {
     0, 1, 0,    // column 1 (local +y)
     s, 0, c     // column 2 (local +z)
   );
+}
+
+/**
+ * Support function for an OBB: project direction into local space, pick the
+ * extreme vertex by sign, transform back to world.
+ */
+function obbSupport(box: Obb) {
+  return (direction: Vec3) => {
+    const r = box.rotation;
+    const lx = r[0] * direction.x + r[1] * direction.y + r[2] * direction.z;
+    const ly = r[3] * direction.x + r[4] * direction.y + r[5] * direction.z;
+    const lz = r[6] * direction.x + r[7] * direction.y + r[8] * direction.z;
+    const sx = lx >= 0 ? box.extents.x : -box.extents.x;
+    const sy = ly >= 0 ? box.extents.y : -box.extents.y;
+    const sz = lz >= 0 ? box.extents.z : -box.extents.z;
+    return {
+      x: box.center.x + r[0] * sx + r[3] * sy + r[6] * sz,
+      y: box.center.y + r[1] * sx + r[4] * sy + r[7] * sz,
+      z: box.center.z + r[2] * sx + r[5] * sy + r[8] * sz
+    };
+  };
 }
 
 describe("Layered collision public surface", () => {
@@ -63,6 +91,36 @@ describe("Layered collision public surface", () => {
 
     expect(bvh.ok).toBe(true);
     expect(world.raycast(ray(vec3(0, 0, 0), vec3(0, 0, -1)))).toEqual([first]);
+  });
+
+  it("updates an existing body's AABB and invalidates the cached BVH", () => {
+    const world = new CollisionWorld();
+    const target = world.addBody(aabb(vec3(-1, -1, -5), vec3(1, 1, -3)));
+    world.addBody(aabb(vec3(4, 4, -5), vec3(5, 5, -3)));
+
+    expect(world.updateBvh().ok).toBe(true);
+    expect(world.raycast(ray(vec3(0, 0, 0), vec3(0, 0, -1)))).toEqual([target]);
+
+    // Move target out of the ray's path; rebuild required.
+    expect(world.updateBody(target, aabb(vec3(20, 20, -5), vec3(21, 21, -3)))).toBe(true);
+    // Without a rebuild, raycast returns empty because the BVH is invalidated.
+    expect(world.raycast(ray(vec3(0, 0, 0), vec3(0, 0, -1)))).toEqual([]);
+
+    expect(world.updateBvh().ok).toBe(true);
+    expect(world.raycast(ray(vec3(0, 0, 0), vec3(0, 0, -1)))).toEqual([]);
+
+    expect(world.updateBody(0xdeadbeef, aabb(vec3(0, 0, 0), vec3(1, 1, 1)))).toBe(false);
+  });
+
+  it("reports body count and presence", () => {
+    const world = new CollisionWorld();
+    expect(world.bodyCount()).toBe(0);
+    const id = world.addBody(aabb(vec3(0, 0, 0), vec3(1, 1, 1)));
+    expect(world.bodyCount()).toBe(1);
+    expect(world.hasBody(id)).toBe(true);
+    world.removeBody(id);
+    expect(world.hasBody(id)).toBe(false);
+    expect(world.bodyCount()).toBe(0);
   });
 
   it("detects OBB overlap with SAT", () => {
@@ -236,4 +294,114 @@ describe("Layered collision public surface", () => {
     expect(epaResult.value.depth).toBeGreaterThan(0);
     expect(epaResult.value.depth).toBeLessThan(1);
   });
+
+  it("returns EPA_MAX_ITERATIONS when the iteration budget is zero", () => {
+    // Build a real 4-simplex via GJK, then call EPA with budget 0 so the loop
+    // never enters and the function falls through to the max-iter error path.
+    // This is the deterministic non-converging witness — an adversarial
+    // support function tends to short-circuit earlier in GJK, so the cleanest
+    // way to land on the EPA boundary is the explicit iteration budget.
+    const a = boxSupport(vec3(0, 0, 0), vec3(1, 1, 1));
+    const b = boxSupport(vec3(1.5, 0.2, 0.3), vec3(1, 1, 1));
+    const ctx = new CollisionContext();
+
+    const hit = gjk(a, b, ctx);
+    expect(hit.ok).toBe(true);
+    if (!hit.ok) return;
+    expect(hit.value.simplexSize).toBe(4);
+
+    const result = epa(hit.value.simplex, hit.value.simplexSize, a, b, ctx, 0);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("EPA_MAX_ITERATIONS");
+      expect(result.error.stage).toBe("EpaExpansion");
+    }
+  });
+
+  it("agrees between SAT and GJK over randomized OBB pairs", () => {
+    // Sweep deterministically generated OBB pairs and require SAT and GJK to
+    // agree on intersection. Pairs that fall within a tiny Minkowski margin
+    // around the boundary are skipped — GJK's strict-positive support test
+    // classifies exact touching as no-hit, while SAT uses inclusive boundary,
+    // so the literal touching set disagrees by design.
+    const rng = createDeterministicRng(seedFromString("mensura:stress:obb-sat-vs-gjk"));
+    const ctx = new CollisionContext();
+    const TOTAL = 80;
+    const MARGIN = 0.02;
+
+    let agreements = 0;
+    let skipped = 0;
+    let disagreements = 0;
+
+    for (let i = 0; i < TOTAL; i++) {
+      const aBox = obb(
+        vec3(unwrapUnit(rng) * 2 - 1, unwrapUnit(rng) * 2 - 1, unwrapUnit(rng) * 2 - 1),
+        vec3(0.5 + unwrapUnit(rng), 0.5 + unwrapUnit(rng), 0.5 + unwrapUnit(rng)),
+        rotationYMat3(unwrapUnit(rng) * Math.PI)
+      );
+      const bCenterOffset = vec3(
+        unwrapUnit(rng) * 6 - 3,
+        unwrapUnit(rng) * 6 - 3,
+        unwrapUnit(rng) * 6 - 3
+      );
+      const bBox = obb(
+        vec3(
+          aBox.center.x + bCenterOffset.x,
+          aBox.center.y + bCenterOffset.y,
+          aBox.center.z + bCenterOffset.z
+        ),
+        vec3(0.5 + unwrapUnit(rng), 0.5 + unwrapUnit(rng), 0.5 + unwrapUnit(rng)),
+        rotationYMat3(unwrapUnit(rng) * Math.PI)
+      );
+
+      const satResult = testObbObbSat(aBox, bBox, ctx);
+      const gjkResult = gjk(obbSupport(aBox), obbSupport(bBox), ctx, 96);
+      expect(gjkResult.ok).toBe(true);
+      if (!gjkResult.ok) continue;
+
+      if (gjkResult.value.intersect === satResult) {
+        agreements++;
+        continue;
+      }
+
+      // Disagreement: probe by perturbing B's extents in both directions. If
+      // either direction flips SAT, the original pair sits inside the
+      // boundary margin and the disagreement is the expected boundary-class
+      // difference (GJK uses strict-positive support, SAT inclusive
+      // boundary).
+      const shrunk = obb(
+        bBox.center,
+        vec3(
+          Math.max(0, bBox.extents.x - MARGIN),
+          Math.max(0, bBox.extents.y - MARGIN),
+          Math.max(0, bBox.extents.z - MARGIN)
+        ),
+        bBox.rotation
+      );
+      const grown = obb(
+        bBox.center,
+        vec3(bBox.extents.x + MARGIN, bBox.extents.y + MARGIN, bBox.extents.z + MARGIN),
+        bBox.rotation
+      );
+      const shrunkSat = testObbObbSat(aBox, shrunk, ctx);
+      const grownSat = testObbObbSat(aBox, grown, ctx);
+      if (shrunkSat !== satResult || grownSat !== satResult) {
+        skipped++;
+      } else {
+        disagreements++;
+      }
+    }
+
+    // SAT skips near-parallel cross axes (`lengthSq3 < 1e-6`), so a small
+    // false-positive rate is expected on near-parallel rotated OBBs. Allow up
+    // to 5% real disagreement as documented boundary noise.
+    expect(disagreements).toBeLessThanOrEqual(Math.ceil(TOTAL * 0.05));
+    expect(skipped).toBeLessThan(TOTAL * 0.2);
+    expect(agreements + skipped + disagreements).toBe(TOTAL);
+  });
 });
+
+function unwrapUnit(rng: ReturnType<typeof createDeterministicRng>): number {
+  const draw = sampleDeterministicUnit(rng);
+  return draw.ok ? draw.value : 0;
+}

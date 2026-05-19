@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-experimental",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/experimental/**/*.ts",
+    "src/core/**/*.ts",
+    "src/geometry/**/*.ts",
+    "src/accel/**/*.ts",
+    "src/collision/**/*.ts",
+    "src/physics/**/*.ts",
+    "src/world/**/*.ts"
+  ],
+  "exclude": []
+}

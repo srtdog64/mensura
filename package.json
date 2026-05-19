@@ -120,6 +120,10 @@
       "types": "./dist/unsafe/*.d.ts",
       "default": "./dist/unsafe/*.js"
     },
+    "./wasm": {
+      "types": "./dist/wasm/index.d.ts",
+      "default": "./dist/wasm/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -150,20 +154,30 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:experimental": "npm run clean:experimental && tsc -p tsconfig.experimental.json",
+    "build:all": "npm run build && npm run build:experimental",
     "benchmark": "npm run build && node benchmark-runner.js",
     "benchmark:check": "npm run build && node benchmark-runner.js --check",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('tsconfig.tsbuildinfo',{force:true});\"",
+    "clean:all": "npm run clean && npm run clean:experimental",
+    "clean:experimental": "node -e \"const fs=require('fs'); fs.rmSync('dist-experimental',{recursive:true,force:true}); fs.rmSync('tsconfig.experimental.tsbuildinfo',{force:true});\"",
     "check": "npm run build && npm test && npm run pack:check",
-    "check:release": "npm run dco:check && npm run check && npm run benchmark:check",
+    "check:contracts": "npm run build && npm run build:experimental && npm run api:snapshot && npm run smoke:bundler && npm run smoke:browser",
+    "check:release": "npm run dco:check && npm run check && npm run check:contracts && npm run benchmark:check",
     "dco:check": "node scripts/dco-check.mjs",
+    "api:snapshot": "node scripts/api-snapshot.mjs",
+    "api:snapshot:write": "node scripts/api-snapshot.mjs --write",
     "pack:check": "npm pack --dry-run",
     "prebuild": "npm run clean",
     "prepack": "npm run build",
+    "smoke:bundler": "tsc -p packages/bundler-smoke/tsconfig.json",
+    "smoke:browser": "vite build --config packages/browser-smoke/vite.config.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
     "gl-matrix": "^3.4.4",
+    "vite": "^8.0.13",
     "vitest": "^4.0.10",
     "wgpu-matrix": "^3.4.0"
   }

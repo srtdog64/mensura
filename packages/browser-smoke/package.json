@@ -1,0 +1,8 @@
+{
+  "name": "@exornea/mensura-browser-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --config vite.config.mjs"
+  }
+}

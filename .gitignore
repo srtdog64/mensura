@@ -1,4 +1,6 @@
 dist/
+dist-experimental/
 node_modules/
 *.tsbuildinfo
 *.tgz
+.mensura-smoke/

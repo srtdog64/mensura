@@ -1,15 +1,21 @@
 import type { Bvh } from "../accel/bvh.js";
-import { buildBvh, bvhRaycast } from "../accel/bvh.js";
+import type { BroadphasePair, BvhBuildOptions } from "../accel/bvh.js";
+import { buildBvh, bvhOverlapPairs, bvhRaycast } from "../accel/bvh.js";
 import { AccelContext } from "../accel/context.js";
 import type { Aabb } from "../geometry/aabb.js";
 import type { Ray } from "../geometry/ray.js";
 import { rayIntersectsAabb } from "../geometry/ray.js";
 import type { Result } from "../core/result.js";
-import { ok, err } from "../core/result.js";
+import { err } from "../core/result.js";
 
 export interface CollisionBody {
   id: number;
   aabb: Aabb;
+}
+
+export interface CollisionBodyPair {
+  readonly a: number;
+  readonly b: number;
 }
 
 export class CollisionWorld {
@@ -34,7 +40,34 @@ export class CollisionWorld {
     return removed;
   }
 
-  public updateBvh(): Result<Bvh> {
+  /**
+   * Replace the AABB of an existing body. Returns `true` when the body was
+   * found and updated. Invalidates the cached BVH so the next `raycast` will
+   * trigger a rebuild on the caller's next `updateBvh()`.
+   *
+   * Callers running dynamic scenes can use this instead of remove+add to
+   * avoid churning ids; the BVH is still rebuilt lazily, not incrementally
+   * (that is on the TODO list once a real workload demands it).
+   */
+  public updateBody(id: number, aabb: Aabb): boolean {
+    const body = this.bodies.get(id);
+    if (!body) {
+      return false;
+    }
+    body.aabb = aabb;
+    this.bvh = null;
+    return true;
+  }
+
+  public hasBody(id: number): boolean {
+    return this.bodies.has(id);
+  }
+
+  public bodyCount(): number {
+    return this.bodies.size;
+  }
+
+  public updateBvh(options: BvhBuildOptions | number = 4): Result<Bvh> {
     this.orderedBodies.length = 0;
     const primitives: Aabb[] = [];
 
@@ -52,7 +85,7 @@ export class CollisionWorld {
       });
     }
 
-    const bvhResult = buildBvh(primitives);
+    const bvhResult = buildBvh(primitives, options);
     if (bvhResult.ok) {
       this.bvh = bvhResult.value;
     }
@@ -76,4 +109,43 @@ export class CollisionWorld {
 
     return hits;
   }
+
+  public broadphasePairs(): CollisionBodyPair[] {
+    if (!this.bvh) {
+      return [];
+    }
+
+    const pairs = bvhOverlapPairs(this.bvh, this.accelCtx);
+    const result: CollisionBodyPair[] = [];
+    const seen = new Set<string>();
+
+    for (let i = 0; i < pairs.length; i++) {
+      const pair = pairs[i] as BroadphasePair;
+      const aBody = this.orderedBodies[pair.a];
+      const bBody = this.orderedBodies[pair.b];
+      if (!aBody || !bBody || !aabbIntersectsBody(aBody.aabb, bBody.aabb)) {
+        continue;
+      }
+      const a = Math.min(aBody.id, bBody.id);
+      const b = Math.max(aBody.id, bBody.id);
+      const key = `${a}:${b}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ a, b });
+      }
+    }
+
+    return result;
+  }
+}
+
+function aabbIntersectsBody(a: Aabb, b: Aabb): boolean {
+  return (
+    b.max.x >= a.min.x &&
+    b.min.x <= a.max.x &&
+    b.max.y >= a.min.y &&
+    b.min.y <= a.max.y &&
+    b.max.z >= a.min.z &&
+    b.min.z <= a.max.z
+  );
 }

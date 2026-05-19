@@ -1,5 +1,8 @@
 import type { MutableVec3, Vec3 } from "../core/vec3.js";
 import { dot3, length3, mutableVec3, scale3Into } from "../core/vec3.js";
+import type { Aabb } from "./aabb.js";
+import { aabbIsEmpty } from "./aabb.js";
+import type { Sphere } from "./sphere.js";
 
 export interface Plane {
   readonly normal: Vec3;
@@ -73,4 +76,49 @@ export function planeNormalizeInto(value: Plane, out: MutablePlane): MutablePlan
 
 export function planeDistanceToPoint(value: Plane, point: Vec3): number {
   return dot3(value.normal, point) + value.constant;
+}
+
+/**
+ * True when the plane crosses through the sphere, i.e. the signed distance
+ * from the plane to the sphere center is within `radius` in absolute value.
+ * Empty sphere (`radius < 0`) cannot cross anything and returns `false`.
+ *
+ * Assumes `normal` has unit length (use `planeNormalize` first for an
+ * arbitrary plane); otherwise this is an "intersection up to `|normal|`" test.
+ */
+export function planeIntersectsSphere(value: Plane, target: Sphere): boolean {
+  if (target.radius < 0) {
+    return false;
+  }
+  const distance = dot3(value.normal, target.center) + value.constant;
+  return distance >= -target.radius && distance <= target.radius;
+}
+
+/**
+ * True when the plane separates the AABB into two non-empty halves. The
+ * standard "projected extent vs distance" test:
+ *
+ *   r = ex · |nx| + ey · |ny| + ez · |nz|         (projected half-extent)
+ *   s = dot(normal, center) + constant            (signed center distance)
+ *   |s| <= r                                       (plane crosses the box)
+ *
+ * where `(ex, ey, ez)` are the AABB half-extents and `(nx, ny, nz)` is the
+ * plane normal. Empty AABB returns `false`.
+ */
+export function planeIntersectsAabb(value: Plane, box: Aabb): boolean {
+  if (aabbIsEmpty(box)) {
+    return false;
+  }
+  const cx = (box.min.x + box.max.x) * 0.5;
+  const cy = (box.min.y + box.max.y) * 0.5;
+  const cz = (box.min.z + box.max.z) * 0.5;
+  const ex = (box.max.x - box.min.x) * 0.5;
+  const ey = (box.max.y - box.min.y) * 0.5;
+  const ez = (box.max.z - box.min.z) * 0.5;
+  const nx = value.normal.x;
+  const ny = value.normal.y;
+  const nz = value.normal.z;
+  const r = ex * Math.abs(nx) + ey * Math.abs(ny) + ez * Math.abs(nz);
+  const s = nx * cx + ny * cy + nz * cz + value.constant;
+  return Math.abs(s) <= r;
 }
