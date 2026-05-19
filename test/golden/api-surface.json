@@ -488,6 +488,7 @@
       "class:AccelContext",
       "function:buildBvh",
       "function:bvhOverlapPairs",
+      "function:bvhOverlapPairsInto",
       "function:bvhRaycast",
       "interface:BroadphasePair",
       "interface:Bvh",
@@ -1400,7 +1401,7 @@
       "class:CollisionContext",
       "function:epa",
       "function:gjk",
-      "function:mprIntersect",
+      "function:mprIntersectExperimental",
       "function:sweptAabbTimeOfImpact",
       "function:sweptSphereTimeOfImpact",
       "function:testObbObbSat",
@@ -1410,7 +1411,7 @@
       "interface:MprResult",
       "interface:MprShape",
       "interface:TimeOfImpact",
-      "type:SupportFunction"
+      "type|type-reexport:SupportFunction"
     ],
     "./collision/index": [
       "const:DEFAULT_FLOAT_TOLERANCE",
@@ -4856,10 +4857,11 @@
       "class:CollisionWorld",
       "function:buildBvh",
       "function:bvhOverlapPairs",
+      "function:bvhOverlapPairsInto",
       "function:bvhRaycast",
       "function:epa",
       "function:gjk",
-      "function:mprIntersect",
+      "function:mprIntersectExperimental",
       "function:sweptAabbTimeOfImpact",
       "function:sweptSphereTimeOfImpact",
       "function:testObbObbSat",
@@ -4876,7 +4878,7 @@
       "interface:MprShape",
       "interface:TimeOfImpact",
       "type:BvhSplitMethod",
-      "type:SupportFunction"
+      "type|type-reexport:SupportFunction"
     ],
     "./query": [
       "reexport:aabbContainsPoint",
@@ -6336,7 +6338,6 @@
       "type:Result"
     ],
     "./wasm": [
-      "const:WASM_SIMD_DEFERRED_KERNELS",
       "function:detectWasmSimd",
       "interface:WasmSimdFeatureReport"
     ],

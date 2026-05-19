@@ -69,7 +69,7 @@ Collision is the least mature public area. Before calling it public-ready:
   recovery witness from a real GJK simplex.
 - CCD: `sweptAabbTimeOfImpact` and `sweptSphereTimeOfImpact` cover linear
   time-of-impact for common tunneling cases.
-- MPR: `mprIntersect` exposes the support-map plus interior-point API shape
+- MPR: `mprIntersectExperimental` exposes the support-map plus interior-point API shape
   needed by MPR, performs the first portal-ray rejection, and resolves the
   current result through the context-owned GJK core until full portal
   refinement is justified by more witness coverage.

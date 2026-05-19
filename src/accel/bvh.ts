@@ -162,7 +162,7 @@ function findSahSplit(
     for (let i = 0; i < indices.length; i++) {
       const index = indices[i];
       const center = primitiveCenter(primitives[index], axis);
-      const bin = Math.min(bins - 1, Math.max(0, Math.floor(((center - min) / extent) * bins)));
+      const bin = clampBin(((center - min) / extent) * bins, bins);
       counts[bin]++;
       expandBoundsByAabb(binBounds[bin], primitives[index]);
     }
@@ -217,7 +217,7 @@ function findSahSplit(
   for (let i = 0; i < indices.length; i++) {
     const index = indices[i];
     const center = primitiveCenter(primitives[index], bestAxis);
-    const bin = Math.min(bins - 1, Math.max(0, Math.floor(((center - min) / extent) * bins)));
+    const bin = clampBin(((center - min) / extent) * bins, bins);
     if (bin <= bestBin) {
       left.push(index);
     } else {
@@ -259,12 +259,26 @@ export function bvhRaycast(bvh: Bvh, ray: Ray, ctx: AccelContext): number[] {
 }
 
 export function bvhOverlapPairs(bvh: Bvh, ctx: AccelContext): BroadphasePair[] {
-  const pairs: BroadphasePair[] = [];
+  return bvhOverlapPairsInto(bvh, ctx, []);
+}
+
+/**
+ * Caller-owned variant. Resets `out.length` to 0 and refills it with
+ * broadphase candidate pairs. Pair objects are freshly allocated each call,
+ * but the array spine is reused across frames when the caller keeps the
+ * same buffer.
+ */
+export function bvhOverlapPairsInto(
+  bvh: Bvh,
+  ctx: AccelContext,
+  out: BroadphasePair[]
+): BroadphasePair[] {
+  out.length = 0;
   if (!bvh.root) {
-    return pairs;
+    return out;
   }
-  collectNodePairs(bvh.root, bvh.root, pairs, ctx);
-  return pairs;
+  collectNodePairs(bvh.root, bvh.root, out, ctx);
+  return out;
 }
 
 function collectNodePairs(a: BvhNode, b: BvhNode, pairs: BroadphasePair[], ctx: AccelContext): void {
@@ -311,12 +325,17 @@ function collectNodePairs(a: BvhNode, b: BvhNode, pairs: BroadphasePair[], ctx: 
     if (b.left) collectNodePairs(a, b.left, pairs, ctx);
     if (b.right) collectNodePairs(a, b.right, pairs, ctx);
   }
-
-  ctx.bvhStack.length = 0;
 }
 
 function axisValue(value: { readonly x: number; readonly y: number; readonly z: number }, axis: number): number {
   return axis === 0 ? value.x : axis === 1 ? value.y : value.z;
+}
+
+function clampBin(value: number, bins: number): number {
+  const slot = Math.floor(value);
+  if (slot < 0) return 0;
+  if (slot >= bins) return bins - 1;
+  return slot;
 }
 
 function primitiveCenter(value: Aabb, axis: number): number {

@@ -1,8 +1,8 @@
-import type { Bvh } from "../accel/bvh.js";
-import type { BroadphasePair, BvhBuildOptions } from "../accel/bvh.js";
-import { buildBvh, bvhOverlapPairs, bvhRaycast } from "../accel/bvh.js";
+import type { Bvh, BvhBuildOptions } from "../accel/bvh.js";
+import { buildBvh, bvhOverlapPairsInto, bvhRaycast } from "../accel/bvh.js";
 import { AccelContext } from "../accel/context.js";
 import type { Aabb } from "../geometry/aabb.js";
+import { aabbIntersectsAabb } from "../geometry/aabb.js";
 import type { Ray } from "../geometry/ray.js";
 import { rayIntersectsAabb } from "../geometry/ray.js";
 import type { Result } from "../core/result.js";
@@ -23,6 +23,8 @@ export class CollisionWorld {
   private bvh: Bvh | null = null;
   private orderedBodies: CollisionBody[] = [];
   private accelCtx: AccelContext = new AccelContext();
+  // Reused across broadphase calls so the array spine does not churn.
+  private broadphaseBuffer: { a: number; b: number }[] = [];
   private nextId = 1;
 
   public addBody(aabb: Aabb): number {
@@ -110,42 +112,32 @@ export class CollisionWorld {
     return hits;
   }
 
+  /**
+   * Broadphase overlap pairs. The BVH partition makes leaf-pair output unique
+   * on its own, so this method maps primitive indices to body ids and emits
+   * them in canonical `(min, max)` order without an extra de-duplication
+   * pass. The internal pair buffer is reused between calls.
+   */
   public broadphasePairs(): CollisionBodyPair[] {
     if (!this.bvh) {
       return [];
     }
 
-    const pairs = bvhOverlapPairs(this.bvh, this.accelCtx);
+    const pairs = bvhOverlapPairsInto(this.bvh, this.accelCtx, this.broadphaseBuffer);
     const result: CollisionBodyPair[] = [];
-    const seen = new Set<string>();
 
     for (let i = 0; i < pairs.length; i++) {
-      const pair = pairs[i] as BroadphasePair;
+      const pair = pairs[i];
       const aBody = this.orderedBodies[pair.a];
       const bBody = this.orderedBodies[pair.b];
-      if (!aBody || !bBody || !aabbIntersectsBody(aBody.aabb, bBody.aabb)) {
+      if (!aBody || !bBody || !aabbIntersectsAabb(aBody.aabb, bBody.aabb)) {
         continue;
       }
       const a = Math.min(aBody.id, bBody.id);
       const b = Math.max(aBody.id, bBody.id);
-      const key = `${a}:${b}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        result.push({ a, b });
-      }
+      result.push({ a, b });
     }
 
     return result;
   }
-}
-
-function aabbIntersectsBody(a: Aabb, b: Aabb): boolean {
-  return (
-    b.max.x >= a.min.x &&
-    b.min.x <= a.max.x &&
-    b.max.y >= a.min.y &&
-    b.min.y <= a.max.y &&
-    b.max.z >= a.min.z &&
-    b.min.z <= a.max.z
-  );
 }
