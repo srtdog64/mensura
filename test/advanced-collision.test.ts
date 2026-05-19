@@ -11,7 +11,7 @@ import {
 } from "../src/accel/index.js";
 import {
   CollisionContext,
-  mprIntersectExperimental,
+  mprIntersect,
   sweptAabbTimeOfImpact,
   sweptSphereTimeOfImpact
 } from "../src/collision/index.js";
@@ -24,6 +24,14 @@ function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
     const normalized = normalize3(direction);
     return scaleAndAdd3(center, normalized, radius);
   };
+}
+
+function boxSupport(center: ReturnType<typeof vec3>, extents: ReturnType<typeof vec3>) {
+  return (direction: ReturnType<typeof vec3>) => vec3(
+    center.x + (direction.x >= 0 ? extents.x : -extents.x),
+    center.y + (direction.y >= 0 ? extents.y : -extents.y),
+    center.z + (direction.z >= 0 ? extents.z : -extents.z)
+  );
 }
 
 describe("SAH BVH and broadphase pairs", () => {
@@ -123,12 +131,12 @@ describe("continuous collision detection", () => {
 describe("MPR-style support map query and WASM SIMD status", () => {
   it("classifies convex support-map pairs through the MPR entry point", () => {
     const ctx = new CollisionContext();
-    const hit = mprIntersectExperimental(
+    const hit = mprIntersect(
       { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
       { center: vec3(1, 0, 0), support: sphereSupport(vec3(1, 0, 0), 1) },
       ctx
     );
-    const miss = mprIntersectExperimental(
+    const miss = mprIntersect(
       { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
       { center: vec3(4, 0, 0), support: sphereSupport(vec3(4, 0, 0), 1) },
       ctx
@@ -140,31 +148,57 @@ describe("MPR-style support map query and WASM SIMD status", () => {
     if (miss.ok) expect(miss.value.intersect).toBe(false);
   });
 
-  it("exposes the unrefined initialPortalDirection (b.center - a.center)", () => {
+  it("classifies exact support-map touching as non-intersecting", () => {
     const ctx = new CollisionContext();
-    const result = mprIntersectExperimental(
+    const result = mprIntersect(
       { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
       { center: vec3(2, 0, 0), support: sphereSupport(vec3(2, 0, 0), 1) },
       ctx
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // Documented stub: returns the raw centre-to-centre vector, not a
-    // refined portal normal.
-    expect(result.value.initialPortalDirection).toEqual(vec3(2, 0, 0));
+    expect(result.value.intersect).toBe(false);
+    expect(result.value.portalDirection).toEqual(vec3(1, 0, 0));
   });
 
-  it("falls back to +X when both shape centers coincide", () => {
+  it("handles coincident interior points as an immediate MPR hit", () => {
     const ctx = new CollisionContext();
-    const result = mprIntersectExperimental(
+    const result = mprIntersect(
       { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
       { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
       ctx
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.initialPortalDirection).toEqual(vec3(1, 0, 0));
+    expect(result.value.portalDirection).toEqual(vec3(1, 0, 0));
     expect(result.value.intersect).toBe(true);
+  });
+
+  it("refines a non-collinear box portal without falling back to GJK", () => {
+    const ctx = new CollisionContext();
+    const result = mprIntersect(
+      { center: vec3(0, 0, 0), support: boxSupport(vec3(0, 0, 0), vec3(1, 1, 1)) },
+      { center: vec3(0.5, 0.35, 0.25), support: boxSupport(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
+      ctx
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.intersect).toBe(true);
+    expect(result.value.iterations).toBeGreaterThan(0);
+  });
+
+  it("returns Result.error when MPR cannot iterate", () => {
+    const ctx = new CollisionContext();
+    const result = mprIntersect(
+      { center: vec3(0, 0, 0), support: boxSupport(vec3(0, 0, 0), vec3(1, 1, 1)) },
+      { center: vec3(0.5, 0.35, 0.25), support: boxSupport(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
+      ctx,
+      0
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("MPR_MAX_ITERATIONS");
   });
 
   it("reports WASM SIMD feature support without requiring a shipped wasm kernel", () => {

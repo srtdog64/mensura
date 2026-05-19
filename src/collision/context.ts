@@ -27,4 +27,16 @@ export class CollisionContext {
   public epaNorm: MutableVec3 = mutableVec3();
   public epaEdge: MutableVec3 = mutableVec3();
   public epaTemp: MutableVec3 = mutableVec3();
+
+  // MPR scratchpad
+  public mprPortal0: MutableVec3 = mutableVec3();
+  public mprPortal1: MutableVec3 = mutableVec3();
+  public mprPortal2: MutableVec3 = mutableVec3();
+  public mprPortal3: MutableVec3 = mutableVec3();
+  public mprCandidate: MutableVec3 = mutableVec3();
+  public mprDir: MutableVec3 = mutableVec3();
+  public mprNegDir: MutableVec3 = mutableVec3();
+  public mprVa: MutableVec3 = mutableVec3();
+  public mprVb: MutableVec3 = mutableVec3();
+  public mprCross: MutableVec3 = mutableVec3();
 }

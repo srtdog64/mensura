@@ -367,7 +367,17 @@ contract follows the standard support-function shape: ask each convex object
 for its farthest point in a direction, then iteratively refine a simplex toward
 the origin.
 
-### 9.2 SAT / OBB / BVH
+### 9.2 MPR
+
+Minkowski Portal Refinement also works in the Minkowski difference, but starts
+from an interior point and constructs a portal intersecting the ray toward the
+origin. Mensura's `mprIntersect` implements the binary intersection path:
+portal discovery builds the initial tetrahedral portal, and portal refinement
+replaces the active portal face with support points until the origin is inside
+the portal or no further support advance is possible. The query follows the
+same strict boundary policy as `gjk`: exact touching is not positive overlap.
+
+### 9.3 SAT / OBB / BVH
 
 The separating axis theorem says two convex polytopes are disjoint if there is
 an axis on which their projected intervals do not overlap. OBB overlap uses a
@@ -399,6 +409,7 @@ deterministic witness tests exist.
 | Frustum plane extraction | Extract planes from world-view-projection matrix | Gil Gribb and Klaus Hartmann, *Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix*, 2001. | Adapted to WebGPU depth and column-vector policy. |
 | Quaternion slerp / rotation curves | Spherical interpolation for rotations | Ken Shoemake, *Animating Rotation with Quaternion Curves*, SIGGRAPH 1985. DOI: `10.1145/325334.325242` | Thresholds are named constants; degenerate basis paths use `Result`. |
 | GJK narrowphase | Convex distance via support mappings | Gilbert, Johnson, Keerthi, *A Fast Procedure for Computing the Distance Between Complex Objects in Three-Dimensional Space*, IEEE Journal on Robotics and Automation 4(2), 1988. DOI: `10.1109/56.2083` | Collision layer remains experimental. |
+| MPR narrowphase | Portal discovery and refinement in the Minkowski difference | Gary Snethen, *XenoCollide: Complex Collision Made Simple*, Game Programming Gems 7, 2008; Daniel Fiser, `libccd` MPR implementation. | Binary `mprIntersect`; penetration/contact recovery remains separate work. |
 | OBB / SAT / BVH direction | OBB overlap and hierarchy traversal | Gottschalk, Lin, Manocha, *OBBTree: A Hierarchical Structure for Rapid Interference Detection*, SIGGRAPH 1996. | Theory background for OBB/SAT/BVH policy. |
 
 ---

@@ -559,6 +559,16 @@ per concurrent caller (worker, async pipeline).
   call on the same context** — copy explicitly if you need to keep the
   points. Exceeding `maxIterations` returns `GJK_MAX_ITERATIONS`.
 
+### `mpr.ts`
+
+- `MprShape = { center, support }` — support-mapped convex shape plus an
+  interior point used to seed the Minkowski portal.
+- `mprIntersect(a, b, ctx, maxIterations = 64, tolerance = 1e-9) →
+  Result<MprResult>` — runs Minkowski Portal Refinement portal discovery and
+  portal refinement directly. Success carries `{ intersect, portalDirection,
+  iterations }`. Exact touching follows the GJK boundary policy and reports
+  `intersect: false`; exhausted iteration budget returns `MPR_MAX_ITERATIONS`.
+
 ### `epa.ts`
 
 - `epa(simplex, simplexSize, supportA, supportB, ctx, maxIterations = 64) →
