@@ -15,7 +15,7 @@ Mensura owns reusable math primitives:
 - vectors, quaternions, and matrices
 - rays, planes, AABBs, spheres, and frustums
 - intersection and overlap tests
-- collision narrowphase and acceleration structures
+- collision narrowphase (SAT, GJK, EPA, MPR, CCD) and acceleration structures
 - WGSL layout metadata and checked DataView projection
 - grid/world coordinate conversion
 - transform compose/decompose helpers
@@ -56,7 +56,7 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/core      float, vector, and matrix math
 @exornea/mensura/geometry  shape primitives: rays, planes, bounds, spheres
 @exornea/mensura/query     ray hits, overlap tests, frustum culling
-@exornea/mensura/collision SAT, GJK, and EPA narrowphase
+@exornea/mensura/collision SAT, GJK, EPA, MPR, and CCD narrowphase
 @exornea/mensura/accel     BVH and broadphase acceleration structures
 @exornea/mensura/world     collision world orchestration
 @exornea/mensura/layout    WGSL-compatible byte layout metadata
@@ -78,6 +78,8 @@ is explicitly unsafe and opt-in.
 
 See [API Stability](docs/api-stability.md) for the release contract.
 See [API Guide](docs/api-guide.md) for layer-by-layer usage notes.
+See [Collision Layer](docs/collision.md) for SAT/GJK/EPA/MPR/CCD boundary
+semantics.
 See [Math Theory](docs/math-theory.md) for the formulas behind float32 loss,
 empty-domain sentinels, RNG algorithms, sampling distributions, geometric
 samplers, and bias diagnostics.
@@ -106,6 +108,24 @@ object policy while amortizing call overhead across many values.
 `unsafe` is intentionally not re-exported by the root facade. Import it by name
 when a caller owns the buffer layout, bounds checks, and aliasing contract.
 
+## Collision Contract
+
+`@exornea/mensura/collision` is still an experimental dogfood layer, but it is
+not a collection of placeholders. Public collision entry points must either
+implement their algorithm, return a documented `Result` failure, or stay out of
+the public package.
+
+- `testObbObbSat` is inclusive for touching OBB boundaries.
+- `gjk` is a strict support-mapped intersection query. Exact touching reports
+  `intersect: false` because the support advance is not strictly positive.
+- `mprIntersect` runs Minkowski Portal Refinement directly for binary convex
+  intersection. It requires `{ center, support }` per shape, returns
+  `{ intersect, portalDirection, iterations }`, and uses the same strict
+  boundary policy as `gjk`.
+- `epa` is the penetration-depth recovery path after a real GJK 4-simplex.
+- CCD helpers report first future contact events, with documented initial
+  overlap behavior per shape family.
+
 ## Failure Model
 
 Operations that can fail at the boundary return `Result<T>` data rather than
@@ -120,7 +140,8 @@ type Result<T> =
 Common error codes: `VALIDATION_INVALID_FORMAT` (bad perspective arguments),
 `TRANSFORM_SINGULAR` (`det = 0` inversion), `TRANSFORM_DEGENERATE_BASIS`
 (`lookAt` with `eye = center`, `quatFromUnitVectors` anti-parallel without a
-stable axis).
+stable axis), `GJK_MAX_ITERATIONS`, `EPA_MAX_ITERATIONS`, and
+`MPR_MAX_ITERATIONS` for collision iteration budgets.
 
 Use `unwrap(result)` for call sites that should fail fast, or `result.ok`
 discrimination for callers that need to handle the error.
@@ -176,9 +197,10 @@ Result-based error handling) live under [examples/](examples/).
 npm run check:release
 ```
 
-This runs build, tests, `npm pack --dry-run`, and the benchmark threshold gate.
-If a release-blocking hot path falls below its relative performance floor, the
-command fails.
+This runs public-source stub checks, build, tests, `npm pack --dry-run`, and
+the benchmark threshold gate. If a release-blocking hot path falls below its
+relative performance floor, or if public `src/` code still describes itself as
+unimplemented placeholder work, the command fails.
 
 The release gate also runs DCO validation, the experimental-module build,
 the API surface snapshot, the `dist/*.d.ts` symbol snapshot, the packaged

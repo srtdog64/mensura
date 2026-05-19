@@ -1,8 +1,9 @@
 # Reference Library Notes
 
-This file collects what Mensura adopts (and what it rejects) from three external
-math libraries: `gl-matrix`, `wgpu-matrix`, and `three.js`. It is a decision log,
-not a tutorial.
+This file collects what Mensura adopts (and what it rejects) from external math
+and collision libraries. The main math references are `gl-matrix`,
+`wgpu-matrix`, and `three.js`; collision notes also cite libccd's MPR
+implementation. It is a decision log, not a tutorial.
 
 The Mensura policy documents in this folder describe what Mensura **is**. This
 file describes what Mensura **borrows** and **why other choices were rejected**.
@@ -75,6 +76,12 @@ re-reading the external repos.
 | `sideEffects: false` tree-shake | gl-matrix | already declared in `package.json`; verification reference |
 
 Every adopted row above has a corresponding line in `docs/TODO.md`.
+
+Additional collision reference rows:
+
+| Topic | Adopted From | Mensura Application |
+| --- | --- | --- |
+| MPR portal discovery/refinement | libccd / XenoCollide | implement binary `mprIntersect` directly; do not expose a placeholder or route the decision through GJK |
 
 ## 2. Library-By-Library Notes
 
@@ -286,3 +293,37 @@ This is the single area where Mensura is intentionally ahead of all three
 references, and it is also the foundation that the rest of Mensura's adoption
 decisions rest on: every numerical algorithm above must eventually be tested
 against `conversionLossF32`-aware thresholds, not bare `1e-5` constants.
+
+## 5. Collision Reference Notes
+
+### 5.1 libccd / XenoCollide
+
+**Adopted**
+
+- **MPR as a support-mapping binary query**: the caller supplies a support
+  function and an interior point. Mensura mirrors that shape with
+  `MprShape = { center, support }`.
+- **Two-phase control flow**: portal discovery builds an initial portal that
+  crosses the origin ray; portal refinement repeatedly replaces the active
+  portal face with a new support point until the origin is enclosed or the
+  support advance stalls.
+- **Per-call tolerance and budget**: Mensura exposes `tolerance` and
+  `maxIterations` on `mprIntersect` rather than hiding them in global state.
+
+**Mensura adaptation**
+
+- `mprIntersect` is binary only. It returns `{ intersect, portalDirection,
+  iterations }` and does not claim penetration depth, contact position, or a
+  contact normal.
+- Iteration failure is `Result.error("MPR_MAX_ITERATIONS")`.
+- Touching follows Mensura's existing GJK boundary policy: exact boundary
+  contact is not reported as positive overlap.
+- Scratch vectors live in `CollisionContext`; there is no module-level mutable
+  state.
+
+**Not adopted**
+
+- libccd's MPR penetration result path. Mensura keeps penetration recovery on
+  GJK + EPA until a dedicated MPR penetration API has its own witnesses.
+- Any global configuration object. Mensura keeps algorithm budgets and
+  tolerance per call.

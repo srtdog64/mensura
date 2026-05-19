@@ -37,7 +37,7 @@ These layers are public enough to dogfood, but not yet stable enough to freeze:
 
 | Subpath | Status | Reason |
 |---|---|---|
-| `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA witnesses for rotated overlap, separation, touching, containment, `GJK_MAX_ITERATIONS`, and EPA penetration recovery are now in place. `GjkResult` exposes `simplex` and `simplexSize` as a context-owned view; `epa(simplex, simplexSize, ...)` takes the explicit size. Remaining: more randomized OBB pairs and a deterministic EPA non-convergence witness. |
+| `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA/MPR/CCD witnesses are in place for common overlap, separation, touching-boundary, iteration-budget, and penetration-recovery cases. `GjkResult` exposes `simplex` and `simplexSize` as a context-owned view; `epa(simplex, simplexSize, ...)` takes the explicit size; `mprIntersect` runs portal discovery/refinement directly for binary convex intersection. Remaining: broader randomized convex support-map coverage and MPR penetration/contact recovery. |
 | `@exornea/mensura/accel` | Experimental | BVH behavior is tested, but builder policy and traversal result contracts may still change. |
 | `@exornea/mensura/world` | Experimental | Useful orchestration layer, but body lifecycle and broadphase ownership are not finalized. |
 | `@exornea/mensura/physics` | Compatibility | Re-export facade for older imports. Do not add new primary APIs here. |
@@ -58,6 +58,10 @@ API drift is checked from the built package, not from source intent:
   `moduleResolution: "Bundler"`.
 - `packages/browser-smoke` runs a Vite production browser bundle against the
   built `dist` files and writes only to ignored `.mensura-smoke/` output.
+- `npm run release:stub-check` scans public `src/` TypeScript for
+  release-blocking stub markers. Public code must implement the advertised
+  behavior, return a documented `Result` failure, or move under
+  `src/experimental`.
 
 When a public API change is intentional, update docs and then run
 `npm run api:snapshot:write` in the same patch.
@@ -100,3 +104,5 @@ An experimental API can move to the stable 0.1 surface when it has:
 - documented failure semantics.
 - no hidden module-level scratch state in hot paths.
 - benchmark coverage if the API exists primarily for performance.
+- no public implementation text marking the API as a stub, placeholder, or
+  intentionally unimplemented path.

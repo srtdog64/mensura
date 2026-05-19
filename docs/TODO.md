@@ -11,7 +11,8 @@ Already in place:
   dual-quat, `Result`.
 - `geometry`: ray, plane, AABB, sphere, OBB, capsule, frustum, triangle mesh.
 - `query`: ray hit data, ray/plane/AABB/sphere/triangle tests, frustum tests.
-- `collision`: SAT, GJK, EPA with caller-owned `CollisionContext`.
+- `collision`: SAT, GJK, EPA, MPR, and CCD with caller-owned
+  `CollisionContext`.
 - `accel`: median and SAH BVH builders with caller-owned `AccelContext`, ray
   traversal, and broadphase overlap pair generation.
 - `world`: `CollisionWorld` orchestration over bodies, BVH, raycast, and
@@ -72,6 +73,9 @@ Collision is the least mature public area. Before calling it public-ready:
 - MPR: `mprIntersect` now runs portal discovery and portal refinement directly
   over support-mapped convex shapes. Remaining MPR work is penetration/contact
   recovery, not binary intersection.
+- Release guard: public source is checked by `release:stub-check`, so
+  placeholder collision exports cannot pass `npm run check:release` or
+  `prepublishOnly`.
 - GJK hot path no longer allocates per call: `CollisionContext` now owns the
   simplex pool, the initial direction, and the working direction. `GjkResult`
   exposes `simplex` and `simplexSize` as a view into the context (valid until

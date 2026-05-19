@@ -246,7 +246,6 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 
 `*Hit` variants return data or `null`; `*Intersects*` returns boolean only.
 
-> hit 객체 필요 없으면 `*Intersects*`. 거리만 필요하면 `*HitDistance`.
 
 ### `obb.ts`
 
@@ -534,51 +533,83 @@ calls — they assume the inputs were validated upstream.
 
 ---
 
-## `@exornea/mensura/collision` — narrowphase
+## `@exornea/mensura/collision` - narrowphase
 
-Three algorithms plus one caller-owned context. The context is the
-load-bearing piece of the **no module-scope scratch** policy — one context
-per concurrent caller (worker, async pipeline).
+SAT, GJK, EPA, MPR, and CCD share one caller-owned context policy. The
+context is the load-bearing piece of the **no module-scope scratch** policy:
+one context per concurrent caller (worker, async pipeline).
 
 ### `context.ts`
 
-- `CollisionContext` — holds every SAT / GJK / EPA scratch slot.
+- `CollisionContext` holds every SAT, GJK, EPA, and MPR scratch slot. Treat it
+  as single-owner mutable state: one context per concurrent caller.
 
 ### `sat.ts`
 
-- `testObbObbSat(a, b, ctx) → boolean` — Separating Axis Theorem with 15
-  axes (3 + 3 + 9 cross products).
+- `testObbObbSat(a, b, ctx) -> boolean` - Separating Axis Theorem with 15
+  axes (3 + 3 + 9 cross products). Boundary policy is inclusive: touching OBB
+  boundaries count as overlap.
 
 ### `gjk.ts`
 
-- `SupportFunction = (dir: Vec3) => Vec3` — caller supplies one per convex
+- `SupportFunction = (dir: Vec3) => Vec3` - caller supplies one per convex
   shape.
-- `gjk(supportA, supportB, ctx, maxIterations = 64) → Result<GjkResult>`.
+- `gjk(supportA, supportB, ctx, maxIterations = 64) -> Result<GjkResult>`.
   Success carries `{ intersect, simplex, simplexSize }`. `simplex` is a
   view into `ctx.gjkSimplex` and **stays valid only until the next `gjk()`
-  call on the same context** — copy explicitly if you need to keep the
-  points. Exceeding `maxIterations` returns `GJK_MAX_ITERATIONS`.
+  call on the same context**. Copy explicitly if you need to keep the points.
+  Exceeding `maxIterations` returns `GJK_MAX_ITERATIONS`.
 
 ### `mpr.ts`
 
-- `MprShape = { center, support }` — support-mapped convex shape plus an
+- `MprShape = { center, support }` - support-mapped convex shape plus an
   interior point used to seed the Minkowski portal.
-- `mprIntersect(a, b, ctx, maxIterations = 64, tolerance = 1e-9) →
-  Result<MprResult>` — runs Minkowski Portal Refinement portal discovery and
+- `mprIntersect(a, b, ctx, maxIterations = 64, tolerance = 1e-9) ->
+  Result<MprResult>` - runs Minkowski Portal Refinement portal discovery and
   portal refinement directly. Success carries `{ intersect, portalDirection,
   iterations }`. Exact touching follows the GJK boundary policy and reports
-  `intersect: false`; exhausted iteration budget returns `MPR_MAX_ITERATIONS`.
+  `intersect: false`; exhausted iteration budget returns
+  `MPR_MAX_ITERATIONS`.
+
+`center` must be inside, or at least very near the interior of, the convex
+shape. The support function must return the farthest point on the shape in the
+given direction. `portalDirection` is useful diagnostic data from the final
+portal face or early exit ray; it is not a penetration normal. Use GJK + EPA
+when a contact normal and depth are required.
+
+```ts
+import { CollisionContext, mprIntersect } from "@exornea/mensura/collision";
+import { normalize3, scaleAndAdd3, vec3 } from "@exornea/mensura/core";
+
+const sphere = (center: ReturnType<typeof vec3>, radius: number) => ({
+  center,
+  support: (direction: ReturnType<typeof vec3>) =>
+    scaleAndAdd3(center, normalize3(direction), radius)
+});
+
+const ctx = new CollisionContext();
+const result = mprIntersect(
+  sphere(vec3(0, 0, 0), 1),
+  sphere(vec3(1, 0, 0), 1),
+  ctx
+);
+
+if (result.ok && result.value.intersect) {
+  console.log(result.value.iterations);
+}
+```
 
 ### `epa.ts`
 
-- `epa(simplex, simplexSize, supportA, supportB, ctx, maxIterations = 64) →
-   Result<EpaResult>` — `{ normal, depth }` for penetration recovery.
+- `epa(simplex, simplexSize, supportA, supportB, ctx, maxIterations = 64) ->
+  Result<EpaResult>` - `{ normal, depth }` for penetration recovery.
   Simplex size < 4 or all faces degenerate returns
   `EPA_DEGENERATE_SIMPLEX`. Iteration limit exhausted returns
   `EPA_MAX_ITERATIONS`.
 
-> hit 여부만 필요하면 `testObbObbSat` 또는 `gjk → intersect`. 침투 normal /
-> depth가 필요하면 GJK 4-simplex 결과를 EPA로.
+For boolean convex overlap, use `testObbObbSat`, `gjk(...).value.intersect`,
+or `mprIntersect(...).value.intersect` depending on shape representation. For
+penetration normal/depth, use a real GJK 4-simplex and pass it to `epa`.
 
 ---
 

@@ -12,7 +12,7 @@ core      semantic number math: float, vectors, matrices, quaternions, Result
 geometry  spatial primitive definitions and primitive-local operations
 query     spatial queries: ray hits, overlap tests, frustum culling
 measure   derived primitive measurements, bounds, and closest-point projections
-collision narrowphase collision algorithms: SAT, GJK, EPA
+collision narrowphase collision algorithms: SAT, GJK, EPA, MPR, CCD
 accel     acceleration structures and broadphase traversal
 world     orchestration over collision bodies and acceleration structures
 layout    WGSL-compatible byte layout metadata
@@ -54,6 +54,9 @@ uniform/storage writes, and Zeno-style binary projections.
 ## Near-Term Gates
 
 - Keep `npm run check` green before expanding the public export surface.
+- Keep `npm run release:stub-check` in `check:release` and `prepublishOnly`.
+  Generated or compiler-targetable code should never depend on a public API
+  that is only a placeholder.
 - Keep `physics` as a compatibility facade. New collision work should land in
   `collision`, `accel`, `query`, or `world` according to responsibility.
 - Keep `layout` as metadata and `data` as the checked projection boundary.

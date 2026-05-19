@@ -8,7 +8,7 @@ assumption.
 ## Rules
 
 1. **Per-call scratch lives on a caller-owned context.** Long-running hot paths
-   (`gjk`, `epa`, `testObbObbSat`, `bvhRaycast`) take a context argument:
+   (`gjk`, `epa`, `mprIntersect`, `testObbObbSat`, `bvhRaycast`) take a context argument:
    `CollisionContext` from `@exornea/mensura/collision`, `AccelContext` from
    `@exornea/mensura/accel`. The caller decides who owns each context.
 2. **One context per concurrent caller.** Two workers must each hold their own
@@ -37,7 +37,7 @@ assumption.
 ```ts
 import { CollisionWorld } from "@exornea/mensura/world";
 import { AccelContext } from "@exornea/mensura/accel";
-import { CollisionContext, gjk, testObbObbSat } from "@exornea/mensura/collision";
+import { CollisionContext, gjk, mprIntersect, testObbObbSat } from "@exornea/mensura/collision";
 
 // One CollisionWorld per worker; its private accel context is not shared.
 const world = new CollisionWorld();
@@ -52,6 +52,7 @@ function step(): void {
   const hits = world.raycast(viewRay);
   const overlap = testObbObbSat(boxA, boxB, collision);
   const probe = gjk(supportA, supportB, collision);
+  const portalProbe = mprIntersect(shapeA, shapeB, collision);
 }
 ```
 

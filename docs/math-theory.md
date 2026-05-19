@@ -377,6 +377,20 @@ replaces the active portal face with support points until the origin is inside
 the portal or no further support advance is possible. The query follows the
 same strict boundary policy as `gjk`: exact touching is not positive overlap.
 
+The Mensura contract is intentionally narrower than full contact generation:
+
+- Input is two convex support-mapped shapes, each with a caller-provided
+  interior point (`center`) and `support(direction)`.
+- Output is a boolean intersection decision plus diagnostic portal data.
+- `portalDirection` is the final portal face direction, not a contact normal.
+- Iteration exhaustion is a data failure: `Result.error.code =
+  "MPR_MAX_ITERATIONS"`.
+- Penetration depth and contact position remain the responsibility of EPA or a
+  future dedicated MPR penetration API.
+
+This keeps binary overlap useful while avoiding a false promise that the portal
+face is already a physically meaningful contact manifold.
+
 ### 9.3 SAT / OBB / BVH
 
 The separating axis theorem says two convex polytopes are disjoint if there is
