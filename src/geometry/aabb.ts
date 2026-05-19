@@ -82,7 +82,19 @@ export function aabbClosestPointInto(box: Aabb, point: Vec3, out: MutableVec3): 
   return clamp3Into(point, box.min, box.max, out);
 }
 
+/**
+ * Squared distance from `point` to the closest point on the AABB. Returns 0
+ * when the point is inside the box.
+ *
+ * Empty AABB (`aabbIsEmpty(box) === true`) returns `+Infinity`. That keeps
+ * finite-radius comparisons such as `dist <= r * r` falling through to false,
+ * so empty boxes overlap nothing. Use `aabbDistanceSqToPointChecked` from
+ * `measure` when the caller needs the empty-domain case as a `Result` error.
+ */
 export function aabbDistanceSqToPoint(box: Aabb, point: Vec3): number {
+  if (aabbIsEmpty(box)) {
+    return Number.POSITIVE_INFINITY;
+  }
   const px = point.x;
   const py = point.y;
   const pz = point.z;

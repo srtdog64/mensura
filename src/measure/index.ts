@@ -11,3 +11,4 @@ export {
   capsuleSegmentDistanceSqToPoint
 } from "../geometry/capsule.js";
 export * from "./triangle.js";
+export * from "./checked.js";

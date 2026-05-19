@@ -62,27 +62,39 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/layout    WGSL-compatible byte layout metadata
 @exornea/mensura/data      checked DataView projection records
 @exornea/mensura/measure   closest points, bounds, areas, barycentric data
+@exornea/mensura/validation Result-first finite, non-empty, non-degenerate checks
 @exornea/mensura/batch     object-array batch kernels for hot loops
 @exornea/mensura/physics   compatibility facade for accel/collision/world
 @exornea/mensura/gpu       WebGPU projection and packed Float32Array bridges
 @exornea/mensura/unsafe    unchecked binary and typed-array projection helpers
 ```
 
-For `0.1.x`, `core`, `geometry`, `query`, `measure`, `gpu`, `layout`, `data`,
-and `batch` are the stable release surface. `collision`, `accel`, and `world`
-are experimental dogfood layers. `physics` is a compatibility facade. `unsafe`
-is explicitly unsafe and opt-in.
+For `0.1.x`, `core`, `geometry`, `query`, `measure`, `validation`, `gpu`,
+`layout`, `data`, and `batch` are the stable release surface. `collision`,
+`accel`, and `world` are experimental dogfood layers. `physics` is a
+compatibility facade. `unsafe` is explicitly unsafe and opt-in.
 
 See [API Stability](docs/api-stability.md) for the release contract.
+See [API Guide](docs/api-guide.md) for layer-by-layer usage notes.
 
 The root facade exports the primary layers. `physics` remains as a compatibility
 facade for older imports, but new code should import `query`, `collision`,
 `accel`, and `world` by responsibility. `measure` owns derived primitive
 measurements and projections such as AABB closest points, capsule bounds,
 triangle normals, areas, barycentric coordinates, and triangle closest points.
+It also exposes `*Checked` variants for boundary callers that want invalid
+measure domains surfaced as `Result` errors.
+`validation` owns `Result`-first precondition checks for finite values,
+non-empty bounds, non-degenerate triangles, and stable float32 conversion loss.
 `layout` describes byte-level records; `data` is the checked `Result`-first
 bridge from semantic values into those records. `batch` keeps the inspectable
 object policy while amortizing call overhead across many values.
+
+> Rule of thumb: if the answer is yes/no, import from `query`. If the answer is
+> a value (point, vector, distance, area), import from `measure`. Shape values
+> themselves (constructors, mutable variants, copies) stay in `geometry`. If
+> the question is whether a value is safe enough to measure or serialize, use
+> `validation`.
 
 `unsafe` is intentionally not re-exported by the root facade. Import it by name
 when a caller owns the buffer layout, bounds checks, and aliasing contract.

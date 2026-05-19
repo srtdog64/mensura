@@ -34,7 +34,7 @@ export function triangleNormalInto(a: Vec3, b: Vec3, c: Vec3, out: MutableVec3):
   return out;
 }
 
-/** Twice the area, useful when the caller wants to avoid the sqrt. */
+/** Twice the area: the length of `cross(b - a, c - a)`. */
 export function triangleDoubleArea(a: Vec3, b: Vec3, c: Vec3): number {
   const ex = b.x - a.x;
   const ey = b.y - a.y;
@@ -57,7 +57,12 @@ export function triangleArea(a: Vec3, b: Vec3, c: Vec3): number {
  * where the reconstructed point is `u*a + v*b + w*c` and `u + v + w == 1` for
  * coplanar inputs. For points off the triangle plane the values still sum to 1
  * but project the orthogonal component onto the plane via the standard Real-Time
- * Collision Detection formulation. Degenerate triangles return `(1, 0, 0)`.
+ * Collision Detection formulation.
+ *
+ * Degenerate triangles (zero area) silently return `(1, 0, 0)` — this is a hot
+ * path that intentionally does not allocate a `Result`. Callers that need an
+ * observable failure should pre-check with `triangleDoubleArea(a, b, c) > 0`
+ * before calling.
  */
 export function triangleBarycentric(a: Vec3, b: Vec3, c: Vec3, p: Vec3): MutableVec3 {
   return triangleBarycentricInto(a, b, c, p, mutableVec3());

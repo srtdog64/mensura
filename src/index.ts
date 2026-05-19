@@ -7,5 +7,6 @@ export * from "./world/index.js";
 export * from "./layout/index.js";
 export * from "./data/index.js";
 export * from "./measure/index.js";
+export * from "./validation/index.js";
 export * from "./batch/index.js";
 export * from "./gpu/index.js";

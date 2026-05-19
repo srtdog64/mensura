@@ -84,6 +84,14 @@
       "types": "./dist/measure/*.d.ts",
       "default": "./dist/measure/*.js"
     },
+    "./validation": {
+      "types": "./dist/validation/index.d.ts",
+      "default": "./dist/validation/index.js"
+    },
+    "./validation/*": {
+      "types": "./dist/validation/*.d.ts",
+      "default": "./dist/validation/*.js"
+    },
     "./batch": {
       "types": "./dist/batch/index.d.ts",
       "default": "./dist/batch/index.js"

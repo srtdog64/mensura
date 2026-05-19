@@ -16,6 +16,8 @@ Already in place:
 - `world`: `CollisionWorld` orchestration over bodies and BVH.
 - `layout` / `data`: WGSL-compatible layout metadata and checked DataView
   projection.
+- `validation`: `Result`-first finite, range, float32-stability, non-empty, and
+  non-degenerate checks before measurement or serialization.
 - `batch`: object-array `*IntoMany` kernels.
 - `gpu`: WebGPU projection and Float32Array bridge.
 - `unsafe`: explicit packed Float32Array and DataView helpers.
@@ -60,6 +62,15 @@ Collision is the least mature public area. Before calling it public-ready:
 - Triangle measurement operations ship in `measure/triangle.ts`:
   `triangleNormal(Into)`, `triangleArea`, `triangleDoubleArea`,
   `triangleBarycentric(Into)`, `triangleClosestPoint(Into)`.
+- Result-first counterparts ship in `measure/checked.ts`:
+  `aabbClosestPointChecked(/Into)`, `aabbDistanceSqToPointChecked`,
+  `aabbGetBoundingSphereChecked(/Into)`,
+  `triangleNormalChecked(/Into)`, `triangleBarycentricChecked(/Into)`,
+  `triangleClosestPointChecked(/Into)`. They pre-test via the
+  `validation` layer and return `MEASURE_EMPTY_DOMAIN` or
+  `MEASURE_DEGENERATE` instead of relying on sentinels.
+- Raw `aabbDistanceSqToPoint` now returns `+Infinity` for empty AABBs
+  (`dist(p, ∅) = +∞`), keeping `dist² ≤ r²` predicates safely false.
 - Capsule predicates ship in `geometry/capsule.ts`; derived bounds/distance
   projections are exposed from `measure`:
   `capsuleContainsPoint`, `capsuleIntersectsSphere`,
