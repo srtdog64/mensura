@@ -132,7 +132,8 @@
     "README.md",
     "CONTRIBUTING.md",
     "DCO.md",
-    "LICENSE"
+    "LICENSE",
+    "perf-benchmark.ts"
   ],
   "keywords": [
     "geometry",

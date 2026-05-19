@@ -1,0 +1,130 @@
+import { buildBvh } from "./dist/accel/index.js";
+import { CollisionContext, mprIntersect } from "./dist/collision/index.js";
+import {
+  add3Into,
+  mat4MultiplyInto,
+  mat4Translation,
+  mutableVec3,
+  normalize3,
+  normalize3Into,
+  scaleAndAdd3,
+  vec3
+} from "./dist/core/index.js";
+import { aabb, ray } from "./dist/geometry/index.js";
+import { rayAabbHitDistance } from "./dist/query/index.js";
+
+const COUNT = 200_000;
+const WARMUPS = 2;
+const SAMPLES = 7;
+
+let checksum = 0;
+
+function main(): void {
+  console.log("Mensura focused perf benchmark");
+  console.log("==============================");
+  console.log(`Node: ${process.version}`);
+  console.log(`Count: ${COUNT}`);
+  console.log(`Samples: ${SAMPLES} median after ${WARMUPS} warmups\n`);
+
+  const vectors = Array.from({ length: 128 }, (_, i) =>
+    vec3(i * 0.125 + 1, i * 0.25 + 2, i * 0.375 + 3)
+  );
+  const matrices = Array.from({ length: 128 }, (_, i) =>
+    mat4Translation(vec3(i * 0.01, i * 0.02, i * 0.03))
+  );
+  const boxes = Array.from({ length: 128 }, (_, i) =>
+    aabb(vec3(i, i % 7, -i - 2), vec3(i + 1, (i % 7) + 1, -i - 1))
+  );
+  const supportA = sphereSupport(vec3(0, 0, 0), 1);
+  const supportB = sphereSupport(vec3(0.75, 0.25, 0), 1);
+  const ctx = new CollisionContext();
+
+  bench("vec3 add3Into", COUNT, () => {
+    const out = mutableVec3();
+    for (let i = 0; i < COUNT; i++) {
+      const a = vectors[i & 127];
+      const b = vectors[(i + 17) & 127];
+      add3Into(a, b, out);
+      checksum += out.x;
+    }
+  });
+
+  bench("vec3 normalize3Into", COUNT, () => {
+    const out = mutableVec3();
+    for (let i = 0; i < COUNT; i++) {
+      normalize3Into(vectors[i & 127], out);
+      checksum += out.y;
+    }
+  });
+
+  bench("mat4 multiplyInto", COUNT / 8, () => {
+    const out = matrices[0].slice();
+    for (let i = 0; i < COUNT / 8; i++) {
+      mat4MultiplyInto(matrices[i & 127], matrices[(i + 31) & 127], out);
+      checksum += out[12];
+    }
+  });
+
+  bench("rayAabbHitDistance", COUNT, () => {
+    const pick = ray(vec3(0.5, 0.5, 0), vec3(0, 0, -1));
+    for (let i = 0; i < COUNT; i++) {
+      checksum += rayAabbHitDistance(pick, boxes[i & 127]) ?? 0;
+    }
+  });
+
+  bench("MPR sphere/sphere", COUNT / 16, () => {
+    for (let i = 0; i < COUNT / 16; i++) {
+      const result = mprIntersect(
+        { center: vec3(0, 0, 0), support: supportA },
+        { center: vec3(0.75, 0.25, 0), support: supportB },
+        ctx
+      );
+      checksum += result.ok && result.value.intersect ? 1 : 0;
+    }
+  });
+
+  bench("BVH build 128 AABBs", 256, () => {
+    for (let i = 0; i < 256; i++) {
+      const result = buildBvh(boxes, { maxPrimitivesPerLeaf: 4, splitMethod: "sah" });
+      checksum += result.ok && result.value.root ? 1 : 0;
+    }
+  });
+
+  console.log(`\nchecksum: ${checksum.toFixed(3)}`);
+}
+
+function bench(name: string, operations: number, fn: () => void): void {
+  const samples: number[] = [];
+  for (let i = 0; i < WARMUPS + SAMPLES; i++) {
+    const start = performance.now();
+    fn();
+    const elapsed = performance.now() - start;
+    if (i >= WARMUPS) {
+      samples.push(elapsed);
+    }
+  }
+
+  samples.sort((a, b) => a - b);
+  const median = samples[Math.floor(samples.length / 2)];
+  const opsPerSecond = operations / (median / 1000);
+  console.log(`${name.padEnd(24)} ${median.toFixed(2).padStart(8)}ms  ${formatOps(opsPerSecond)}`);
+}
+
+function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
+  return (direction: ReturnType<typeof vec3>) => {
+    const normalized = normalize3(direction);
+    return scaleAndAdd3(center, normalized, radius);
+  };
+}
+
+function formatOps(value: number): string {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M ops/s`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}K ops/s`;
+  }
+  return `${value.toFixed(1)} ops/s`;
+}
+
+main();

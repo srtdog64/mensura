@@ -9,7 +9,8 @@
     "LICENSE",
     "README.md",
     "dist",
-    "docs"
+    "docs",
+    "perf-benchmark.ts"
   ],
   "exports": [
     ".",

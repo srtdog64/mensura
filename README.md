@@ -191,6 +191,40 @@ console.log(rayAabbHitDistance(pickRay, bounds));
 Worked examples (camera+frustum, TRS compose/decompose, quaternion operations,
 Result-based error handling) live under [examples/](examples/).
 
+## Performance Snapshot
+
+Latest local benchmark snapshot:
+
+```txt
+Node: v22.17.0
+Samples: 7 median after 2 warmups
+Date: 2026-05-20
+```
+
+Selected release-gated results:
+
+| Case | Mensura | Reference / baseline | Ratio |
+|---|---:|---:|---:|
+| `add3Into` | 108.7M ops/s | gl-matrix `vec3.add` 96.9M ops/s | 1.12x |
+| `normalize3Into` | 93.5M ops/s | gl-matrix `vec3.normalize` 83.2M ops/s | 1.12x |
+| `mat4MultiplyInto` | 44.1M ops/s | gl-matrix `mat4.multiply` 37.4M ops/s | 1.18x |
+| `affinePoint3Into` | 98.1M ops/s | gl-matrix `vec3.transformMat4` 63.2M ops/s | 1.55x |
+| `add3IntoMany` | 280.8M ops/s | gl-matrix loop 174.6M ops/s | 1.61x |
+| `unsafeVec3AddF32Many` | 729.7M ops/s | scalar object loop 190.0M ops/s | 3.84x |
+| `unsafeVec3DotF32Many` | 806.5M ops/s | `dot3IntoMany` 369.6M ops/s | 2.18x |
+| `unsafeVec3CrossF32Many` | 524.4M ops/s | `cross3IntoMany` 272.2M ops/s | 1.93x |
+
+`npm run benchmark` is the authoritative comparison harness used by
+`benchmark:check`. A smaller focused local probe is also committed:
+
+```sh
+npm run build
+node --experimental-strip-types perf-benchmark.ts
+```
+
+See [Performance](docs/performance.md) for the full table, interpretation, and
+API selection guide.
+
 ## Release Gate
 
 ```sh
