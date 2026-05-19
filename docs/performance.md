@@ -47,104 +47,115 @@ Environment:
 ```txt
 Node: v22.17.0
 Samples: 7 median after 2 warmups
-Date: 2026-05-18
+Date: 2026-05-20
 ```
 
 ### Per-Call (object API)
 
 ```txt
 vec3 add
-naive object baseline                  85.0M ops/s  1.00x
-Mensura add3                           77.2M ops/s  0.91x
-Mensura add3Into                      104.8M ops/s  1.23x
-gl-matrix vec3.add                     95.7M ops/s  1.13x
-wgpu-matrix vec3.add                   68.4M ops/s  0.80x
+naive object baseline                  86.8M ops/s  1.00x
+Mensura add3                           88.1M ops/s  1.02x
+Mensura add3Into                      108.7M ops/s  1.25x
+gl-matrix vec3.add                     96.9M ops/s  1.12x
+wgpu-matrix vec3.add                   81.5M ops/s  0.94x
 
 vec3 normalize
-naive object baseline                  62.3M ops/s  1.00x
-Mensura normalize3                     52.1M ops/s  0.84x
-Mensura normalize3Into                 84.5M ops/s  1.36x
-gl-matrix vec3.normalize               44.1M ops/s  0.71x
-wgpu-matrix vec3.normalize             39.1M ops/s  0.63x
+naive object baseline                  66.0M ops/s  1.00x
+Mensura normalize3                     61.2M ops/s  0.93x
+Mensura normalize3Into                 93.5M ops/s  1.42x
+gl-matrix vec3.normalize               83.2M ops/s  1.26x
+wgpu-matrix vec3.normalize             51.5M ops/s  0.78x
 
 mat4 multiply
-Mensura mat4Multiply                   29.3M ops/s  1.00x
-Mensura mat4MultiplyInto               40.8M ops/s  1.39x
-gl-matrix mat4.multiply                33.1M ops/s  1.13x
-wgpu-matrix mat4.multiply              33.1M ops/s  1.13x
+Mensura mat4Multiply                   33.6M ops/s  1.00x
+Mensura mat4MultiplyInto               44.1M ops/s  1.32x
+gl-matrix mat4.multiply                37.4M ops/s  1.12x
+wgpu-matrix mat4.multiply              33.4M ops/s  0.99x
 
 mat4 transform
-Mensura mat4TransformPoint3            76.4M ops/s  1.00x
-Mensura mat4TransformPoint3Into        80.0M ops/s  1.05x
-Mensura affinePoint3Into               88.2M ops/s  1.15x
-gl-matrix vec3.transformMat4           60.2M ops/s  0.79x
-wgpu-matrix vec3.transformMat4         52.5M ops/s  0.69x
+Mensura mat4TransformPoint3            79.7M ops/s  1.00x
+Mensura mat4TransformPoint3Into        79.9M ops/s  1.00x
+Mensura affinePoint3Into               98.1M ops/s  1.23x
+gl-matrix vec3.transformMat4           63.2M ops/s  0.79x
+wgpu-matrix vec3.transformMat4         55.1M ops/s  0.69x
+
+ray/aabb
+Mensura rayAabbHitDistance             55.8M ops/s  1.00x
+
+f32 write
+gpu vec3WriteFloat32                  133.6M ops/s  1.00x
+unsafeVec3WriteFloat32                122.7M ops/s  0.92x
+unsafeVec3WriteDataViewF32             91.0M ops/s  0.68x
+gpu mat4WriteFloat32                  108.6M ops/s  0.81x
+unsafeMat4WriteFloat32                 97.2M ops/s  0.73x
+unsafeMat4WriteDataViewF32             39.1M ops/s  0.29x
 ```
 
 ### Batch (object array vs unsafe Float32Array)
 
 ```txt
 vec3 add batch
-scalar object loop (add3Into)         199.0M ops/s  1.00x
-Mensura add3IntoMany                  234.8M ops/s  1.18x
-unsafe vec3 F32 Many                  582.7M ops/s  2.93x
-gl-matrix loop                        148.1M ops/s  0.74x
+scalar object loop (add3Into)         190.0M ops/s  1.00x
+Mensura add3IntoMany                  280.8M ops/s  1.48x
+unsafe vec3 F32 Many                  729.7M ops/s  3.84x
+gl-matrix loop                        174.6M ops/s  0.92x
 
 vec3 normalize batch
-scalar object loop (normalize3Into)   197.3M ops/s  1.00x
-Mensura normalize3IntoMany            261.3M ops/s  1.32x
-unsafe vec3 F32 Many                  283.8M ops/s  1.44x
-gl-matrix loop                        186.5M ops/s  0.95x
+scalar object loop (normalize3Into)   255.5M ops/s  1.00x
+Mensura normalize3IntoMany            293.7M ops/s  1.15x
+unsafe vec3 F32 Many                  306.5M ops/s  1.20x
+gl-matrix loop                        198.3M ops/s  0.78x
 
 mat4 affine transform batch
-scalar object loop (affinePoint3Into) 215.5M ops/s  1.00x
-Mensura affinePoint3IntoMany          311.5M ops/s  1.45x
-unsafe mat4 affine F32 Many           365.8M ops/s  1.70x
-gl-matrix loop                        155.1M ops/s  0.72x
+scalar object loop (affinePoint3Into) 197.3M ops/s  1.00x
+Mensura affinePoint3IntoMany          295.8M ops/s  1.50x
+unsafe mat4 affine F32 Many           419.2M ops/s  2.12x
+gl-matrix loop                        158.1M ops/s  0.80x
 
 vec3 add batch (WGSL stride 16)
-unsafe vec3 F32 Many (stride 12)      747.9M ops/s  1.00x
-unsafe vec3 F32 Many (stride 16)      694.0M ops/s  0.93x
+unsafe vec3 F32 Many (stride 12)      680.3M ops/s  1.00x
+unsafe vec3 F32 Many (stride 16)      673.0M ops/s  0.99x
 
 mat4 multiply batch
-scalar object loop (mat4MultiplyInto)  57.3M ops/s  1.00x
-unsafe mat4 F32 Many                   51.1M ops/s  0.89x
-gl-matrix loop                         38.5M ops/s  0.67x
+scalar object loop (mat4MultiplyInto)  48.8M ops/s  1.00x
+unsafe mat4 F32 Many                   48.3M ops/s  0.99x
+gl-matrix loop                         43.9M ops/s  0.90x
 
 vec3 dot batch
-Mensura dot3IntoMany                  386.2M ops/s  1.00x
-unsafe vec3 dot F32 Many              794.7M ops/s  2.06x
-gl-matrix loop                        222.4M ops/s  0.58x
+Mensura dot3IntoMany                  369.6M ops/s  1.00x
+unsafe vec3 dot F32 Many              806.5M ops/s  2.18x
+gl-matrix loop                        246.7M ops/s  0.67x
 
 vec3 cross batch
-Mensura cross3IntoMany                251.0M ops/s  1.00x
-unsafe vec3 cross F32 Many            650.6M ops/s  2.59x
-gl-matrix loop                        151.4M ops/s  0.60x
+Mensura cross3IntoMany                272.2M ops/s  1.00x
+unsafe vec3 cross F32 Many            524.4M ops/s  1.93x
+gl-matrix loop                        165.2M ops/s  0.61x
 
 mat4 transform batch (perspective)
-Mensura transformPoint3IntoMany       234.6M ops/s  1.00x
-unsafe mat4 transformPoint3 F32 Many  231.8M ops/s  0.99x
-gl-matrix loop                        150.7M ops/s  0.64x
+Mensura transformPoint3IntoMany       256.7M ops/s  1.00x
+unsafe mat4 transformPoint3 F32 Many  257.5M ops/s  1.00x
+gl-matrix loop                        160.8M ops/s  0.63x
 
 vec3 length batch
-Mensura length3IntoMany               428.1M ops/s  1.00x
-unsafe vec3 length F32 Many           402.3M ops/s  0.94x
+Mensura length3IntoMany               508.8M ops/s  1.00x
+unsafe vec3 length F32 Many           504.9M ops/s  0.99x
 
 vec3 distance batch
-Mensura distance3IntoMany             276.7M ops/s  1.00x
-unsafe vec3 distance F32 Many         436.3M ops/s  1.58x
+Mensura distance3IntoMany             390.6M ops/s  1.00x
+unsafe vec3 distance F32 Many         490.9M ops/s  1.26x
 
 vec3 scaleAndAdd batch
-Mensura scaleAndAdd3IntoMany          214.3M ops/s  1.00x
-unsafe vec3 scaleAndAdd F32 Many      686.0M ops/s  3.20x
+Mensura scaleAndAdd3IntoMany          208.0M ops/s  1.00x
+unsafe vec3 scaleAndAdd F32 Many      479.8M ops/s  2.31x
 
 quat multiply batch
-Mensura quatMultiplyIntoMany          171.0M ops/s  1.00x
-unsafe quat multiply F32 Many         308.2M ops/s  1.80x
+Mensura quatMultiplyIntoMany          180.3M ops/s  1.00x
+unsafe quat multiply F32 Many         245.9M ops/s  1.36x
 
 mat4 transform direction batch
-Mensura transformDirection3IntoMany   349.1M ops/s  1.00x
-unsafe mat4 transformDirection3 F32 Many  271.0M ops/s  0.78x
+Mensura transformDirection3IntoMany   284.4M ops/s  1.00x
+unsafe mat4 transformDirection3 F32 Many  320.9M ops/s  1.13x
 ```
 
 ## Reading The Results
@@ -152,26 +163,27 @@ unsafe mat4 transformDirection3 F32 Many  271.0M ops/s  0.78x
 - **`Into` paths are the per-call hot-loop win.** `vec3` and `mat4` reuse
   outputs and avoid repeated object/array allocation. On this Node/V8 run,
   Mensura `Into` paths are competitive with `gl-matrix` and `wgpu-matrix`;
-  `add3Into`, `normalize3Into`, and transform paths beat the matching reference
-  cases on this run.
+  `add3Into`, `normalize3Into`, `mat4MultiplyInto`, and `affinePoint3Into`
+  beat the matching gl-matrix reference cases on this run.
 - **Batch object APIs (`*IntoMany`) amortize call overhead.** For very small
   per-call bodies (vec3 add: 3 additions), Mensura batch stays close to a
-  hand-rolled scalar loop, while a hand-rolled gl-matrix loop is **0.74x**;
-  the gap is the cross-package call cost gl-matrix pays per element. For larger
+  hand-rolled scalar loop, while a hand-rolled gl-matrix loop is **0.92x** of
+  the scalar loop and **0.62x** of `add3IntoMany`; the gap is the
+  cross-package call cost gl-matrix pays per element. For larger
   per-call bodies (mat4 affine transform: matrix hoist plus point math),
-  Mensura batch is **1.45x** the scalar loop because the matrix read is hoisted
+  Mensura batch is **1.50x** the scalar loop because the matrix read is hoisted
   out of the inner loop.
 - **`unsafe/*F32Many` is the largest win for small kernels.** Packed
-  `Float32Array` + a single function call gives **2.93x** on vec3 add and
-  **1.70x** on mat4 affine transform versus the scalar object loop, and about
-  **3.9x** versus the gl-matrix vec3-add loop. The win compounds with
+  `Float32Array` + a single function call gives **3.84x** on vec3 add and
+  **2.12x** on mat4 affine transform versus the scalar object loop, and about
+  **4.18x** versus the gl-matrix vec3-add loop. The win compounds with
   `SharedArrayBuffer` views, since no copy is involved.
 - **`unsafe` does not always win.** For `mat4 multiply` (64 multiplies per
   pair), the inner body is so large that call overhead is negligible; unsafe
-  batch is **0.89x** of the scalar object loop on this run. **Use unsafe only
+  batch is **0.99x** of the scalar object loop on this run. **Use unsafe only
   when the per-call body is small or the data is already packed.**
 - **WGSL stride 16 vs packed stride 12 is close but not guaranteed faster** on
-  this run (0.93x). Choose stride based on the layout contract with WGSL /
+  this run (0.99x). Choose stride based on the layout contract with WGSL /
   uniform binding, not for raw speed.
 - **`unsafe` is not automatically faster.** It means unchecked layout access
   for generated code, binary projections, and shared memory. `DataView`
