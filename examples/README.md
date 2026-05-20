@@ -30,3 +30,11 @@ specific example with `tsx`, `ts-node`, or after `tsc` against
   ray-hit fixtures. `npm run visual:ray` builds the package and writes SVG,
   2D HTML, 3D Canvas HTML, and a regression-tested JSON manifest to
   `.mensura-visual/`.
+
+## Visual Ray Fixture Preview
+
+This checked-in preview mirrors the 3D Canvas output from
+`npm run visual:ray`, so package users can understand the expected ray hit
+layout before running the generator.
+
+![Ray hit visual fixture preview](visual-ray-fixtures-3d-preview.png)

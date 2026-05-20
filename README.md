@@ -209,6 +209,10 @@ dependency-free SVG, 2D HTML, 3D Canvas HTML, and JSON manifest artifacts to
 regression test that the rendered manifest values match the actual ray API
 calculations.
 
+The checked-in preview at
+[examples/visual-ray-fixtures-3d-preview.png](examples/visual-ray-fixtures-3d-preview.png)
+shows the intended 3D layout without running the generator.
+
 ## Performance Snapshot
 
 Latest local benchmark snapshot:

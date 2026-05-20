@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { normalize3, vec3 } from "../src/core/index.js";
 import { aabb, capsule, ray, sphere } from "../src/geometry/index.js";
@@ -27,6 +28,14 @@ const api = {
 };
 
 describe("visual ray fixture regression", () => {
+  it("ships a PNG smoke preview for the visual example", () => {
+    const preview = readFileSync(new URL("../examples/visual-ray-fixtures-3d-preview.png", import.meta.url));
+    const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+    expect([...preview.subarray(0, pngSignature.length)]).toEqual(pngSignature);
+    expect(preview.length).toBeGreaterThan(40_000);
+  });
+
   it("keeps the rendered 3D manifest equal to the computed fixture data", () => {
     const data = createRayVisualFixtures(api);
     const html = renderRayVisual3dHtml(data);
