@@ -276,6 +276,25 @@ into a professional-grade math library. These items are not all required for a
 - Add benchmark cases for geometry and collision hot paths:
   ray/AABB, ray/triangle, frustum/AABB, BVH traversal, broadphase pair
   generation, GJK/MPR, EPA, and CCD.
+- Keep Geukbit dogfood regressions in perspective: a ~4-5% movement in a
+  `distanceSq3`-mediated visibility candidate loop is not automatically a
+  Mensura release blocker. Treat it as host/V8 noise unless a repeated Geukbit
+  witness shows sustained regression above the benchmark budget.
+- Preserve the safe/hot split:
+  - public boundary APIs may validate finite values, empty domains, and
+    `Result` contracts;
+  - frame hot loops should use raw `core`/`query`/`measure` functions,
+    `Into`, caller-owned buffers, and existing `raycastManyAabbInto` /
+    `overlapManyAabbInto`;
+  - only add new batch or typed-array APIs when a Geukbit benchmark identifies
+    the hot loop and the new API has its own Mensura witness.
+- Candidate future hot APIs, gated by Geukbit evidence rather than intuition:
+  - `distanceSq3IntoMany` or packed `unsafeVec3DistanceSqF32Many` for large
+    visibility/selection candidate sets;
+  - `selectNearestAabbHitInto` only if `nearestRayAabbHitInto` is not enough
+    for Geukbit's semantic mapping;
+  - projection-specific packed visibility filters if scene snapshot rebuild is
+    no longer the dominant cost.
 - Do not add WASM SIMD kernels until a real workload proves that JS unsafe
   kernels are the bottleneck. If WASM ships, require documented memory
   ownership, fallback behavior, generation steps, checksum/provenance, and

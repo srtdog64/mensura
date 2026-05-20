@@ -35,6 +35,23 @@ hot-path performance claim. Known non-winning cases such as packed mat4
 multiply and unstable cases such as packed quaternion multiply are documented
 guidance, not release blockers.
 
+Geukbit dogfood benchmarks are treated as workload witnesses, not automatic
+Mensura gate changes. A small movement such as a 4-5% change in a
+`distanceSq3`-mediated viewport visibility candidate loop can be V8 tiering,
+CPU scheduling, cache state, or the cost of stronger boundary contracts. Do
+not add an unchecked or batch API just because one consumer benchmark moved by
+that amount once. Add a Mensura hot API only when the workload is repeated,
+the hot loop is isolated, and the new API has a local benchmark witness.
+
+Safe public APIs and hot APIs are intentionally separated:
+
+- boundary code can pay for finite checks, empty-domain checks, `Result`
+  contracts, and clearer failure metadata.
+- frame hot loops should prefer raw `core` / `query` / `measure`, `Into`
+  forms, caller-owned buffers, and existing many-query helpers.
+- `unsafe` and packed-memory APIs require measured wins on the current
+  Node/V8 or browser runtime, plus a fallback path.
+
 The gate uses ratios instead of absolute ops/sec because V8 tiering and OS
 scheduling make single-machine microbenchmarks noisy. The threshold constants
 live next to the benchmark cases in `benchmark-runner.js` with comments
