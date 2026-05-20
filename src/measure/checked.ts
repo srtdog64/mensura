@@ -19,13 +19,15 @@ import {
   aabbClosestPointInto,
   aabbDistanceSqToPoint,
   aabbGetBoundingSphereInto,
-  aabbIsEmpty
+  aabbIsEmpty,
+  aabbSignedDistanceToPoint
 } from "../geometry/aabb.js";
-import type { MutableSphere } from "../geometry/sphere.js";
-import { mutableSphere } from "../geometry/sphere.js";
+import type { MutableSphere, Sphere } from "../geometry/sphere.js";
+import { mutableSphere, sphereSignedDistanceToPoint } from "../geometry/sphere.js";
 import {
   validateFiniteVec3,
   validateNonEmptyAabb,
+  validateSphere,
   validateTriangle
 } from "../validation/index.js";
 import {
@@ -134,6 +136,18 @@ export function aabbDistanceSqToPointChecked(box: Aabb, point: Vec3): Result<num
 }
 
 /**
+ * Signed distance to the AABB surface. Empty AABB returns
+ * `MEASURE_EMPTY_DOMAIN`.
+ */
+export function aabbSignedDistanceToPointChecked(box: Aabb, point: Vec3): Result<number> {
+  const domain = validateAabbMeasureDomain(box, point);
+  if (!domain.ok) {
+    return domain;
+  }
+  return ok(aabbSignedDistanceToPoint(box, point));
+}
+
+/**
  * Bounding sphere of the AABB. Empty AABB returns `MEASURE_EMPTY_DOMAIN`.
  *
  * The raw `aabbGetBoundingSphere` returns `radius = -1` (empty-sphere
@@ -153,6 +167,24 @@ export function aabbGetBoundingSphereCheckedInto(
     return domain;
   }
   return ok(aabbGetBoundingSphereInto(box, out));
+}
+
+/**
+ * Signed distance to the sphere surface. Invalid sphere radius returns the
+ * validation layer's `VALIDATION_INVALID_RADIUS`.
+ */
+export function sphereSignedDistanceToPointChecked(value: Sphere, point: Vec3): Result<number> {
+  const sphereResult = validateSphere(value, { label: "sphere", stage: STAGE });
+  if (!sphereResult.ok) {
+    return sphereResult;
+  }
+
+  const pointResult = validateFiniteVec3(point, { label: "point", stage: STAGE });
+  if (!pointResult.ok) {
+    return pointResult;
+  }
+
+  return ok(sphereSignedDistanceToPoint(value, point));
 }
 
 /**

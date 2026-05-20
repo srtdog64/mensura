@@ -419,6 +419,13 @@ export interface Mat4DecomposedTrs {
   readonly scale: MutableVec3;
 }
 
+export interface ViewportRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export function mat4Compose(translation: Vec3, rotation: Quat, scale: Vec3): MutableMat4 {
   return mat4ComposeInto(translation, rotation, scale, mat4Identity());
 }
@@ -541,4 +548,86 @@ export function mat4DecomposeInto(
     rotation.y = (r12 + r21) / s;
     rotation.z = 0.25 * s;
   }
+}
+
+export function mat4ProjectPoint3WebGpu(
+  matrix: Mat4Like,
+  point: Vec3,
+  viewport: ViewportRect
+): Result<MutableVec3> {
+  return mat4ProjectPoint3WebGpuInto(matrix, point, viewport, mutableVec3());
+}
+
+export function mat4ProjectPoint3WebGpuInto(
+  matrix: Mat4Like,
+  point: Vec3,
+  viewport: ViewportRect,
+  out: MutableVec3
+): Result<MutableVec3> {
+  const valid = validateViewportRect(viewport);
+  if (!valid.ok) {
+    return err(valid.error);
+  }
+
+  mat4TransformPoint3Into(matrix, point, out);
+  const ndcX = out.x;
+  const ndcY = out.y;
+
+  out.x = viewport.x + (ndcX + 1) * 0.5 * viewport.width;
+  out.y = viewport.y + (1 - ndcY) * 0.5 * viewport.height;
+  return ok(out);
+}
+
+/**
+ * Unprojects a WebGPU viewport-space point with a caller-provided inverse
+ * world-view-projection matrix. The input `point.z` is WebGPU clip depth
+ * (`0..1`), and viewport `y` is top-down canvas pixel space.
+ */
+export function mat4UnprojectPoint3WebGpu(
+  inverseMatrix: Mat4Like,
+  point: Vec3,
+  viewport: ViewportRect
+): Result<MutableVec3> {
+  return mat4UnprojectPoint3WebGpuInto(inverseMatrix, point, viewport, mutableVec3());
+}
+
+export function mat4UnprojectPoint3WebGpuInto(
+  inverseMatrix: Mat4Like,
+  point: Vec3,
+  viewport: ViewportRect,
+  out: MutableVec3
+): Result<MutableVec3> {
+  const valid = validateViewportRect(viewport);
+  if (!valid.ok) {
+    return err(valid.error);
+  }
+
+  const x = ((point.x - viewport.x) / viewport.width) * 2 - 1;
+  const y = 1 - ((point.y - viewport.y) / viewport.height) * 2;
+  const z = point.z;
+  const w = inverseMatrix[3] * x + inverseMatrix[7] * y + inverseMatrix[11] * z + inverseMatrix[15];
+  const invW = w === 0 ? 1 : 1 / w;
+
+  out.x = (inverseMatrix[0] * x + inverseMatrix[4] * y + inverseMatrix[8] * z + inverseMatrix[12]) * invW;
+  out.y = (inverseMatrix[1] * x + inverseMatrix[5] * y + inverseMatrix[9] * z + inverseMatrix[13]) * invW;
+  out.z = (inverseMatrix[2] * x + inverseMatrix[6] * y + inverseMatrix[10] * z + inverseMatrix[14]) * invW;
+  return ok(out);
+}
+
+function validateViewportRect(viewport: ViewportRect): Result<true> {
+  if (
+    !Number.isFinite(viewport.x) ||
+    !Number.isFinite(viewport.y) ||
+    !(viewport.width > 0) ||
+    !(viewport.height > 0)
+  ) {
+    return err(mensuraError({
+      code: "VALIDATION_INVALID_FORMAT",
+      stage: "ValidateInput",
+      message: "Viewport must have finite origin and positive width/height.",
+      meta: { viewport }
+    }));
+  }
+
+  return ok(true);
 }

@@ -1,5 +1,5 @@
 import type { MutableVec3, Vec3 } from "../core/vec3.js";
-import { distanceSq3, mutableVec3 } from "../core/vec3.js";
+import { distance3, distanceSq3, mutableVec3 } from "../core/vec3.js";
 import type { Aabb, MutableAabb } from "./aabb.js";
 import { aabbDistanceSqToPoint, mutableAabb } from "./aabb.js";
 
@@ -51,6 +51,18 @@ export function sphereIntersectsAabb(value: Sphere, box: Aabb): boolean {
     return false;
   }
   return aabbDistanceSqToPoint(box, value.center) <= value.radius * value.radius;
+}
+
+/**
+ * Signed distance from `point` to the sphere surface. Negative values are
+ * inside, zero is on the boundary, and positive values are outside.
+ * Empty sphere (`radius < 0`) returns `+Infinity`.
+ */
+export function sphereSignedDistanceToPoint(value: Sphere, point: Vec3): number {
+  if (value.radius < 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return distance3(value.center, point) - value.radius;
 }
 
 /**

@@ -8,9 +8,11 @@ the current package shape, not the historical reference-reading checklist.
 Already in place:
 
 - `core`: float policy, conversion loss, vec3/vec4, mat3/mat4, quat, euler,
-  dual-quat, `Result`.
+  dual-quat, WebGPU viewport project/unproject helpers, `Result`.
 - `geometry`: ray, plane, AABB, sphere, OBB, capsule, frustum, triangle mesh.
 - `query`: ray hit data, ray/plane/AABB/sphere/triangle tests, frustum tests.
+- `measure`: closest points, bounds, triangle helpers, and signed distance
+  helpers for AABB/sphere surfaces.
 - `collision`: SAT, GJK, EPA, MPR, and CCD with caller-owned
   `CollisionContext`.
 - `accel`: median and SAH BVH builders with caller-owned `AccelContext`, ray
@@ -34,6 +36,10 @@ Already in place:
 - Verification gates: `npm run check`, `npm run benchmark`,
   `npm pack --dry-run`, `npm run check:contracts`, and
   `npm run check:release`.
+- Human visual inspection: `npm run visual:ray` writes dependency-free ray hit
+  SVG, 2D HTML, 3D Canvas HTML, and JSON manifest fixtures into ignored
+  `.mensura-visual/`. `test/visual-ray-fixtures.test.ts` keeps the visual
+  manifest values tied to the actual ray API calculations.
 - Release hardening has started: golden fixtures, deterministic fuzz
   invariants, experimental-module build output (`dist-experimental/`, ignored),
   package export plus `dist/*.d.ts` symbol snapshot, packaged
@@ -174,6 +180,119 @@ Filled the previously empty cells in the shape-pair matrix:
 - Keep reference-library notes as historical rationale only; do not let them
   override current code truth.
 - Add `README` badges or status only after the API freeze policy is written.
+
+## P6: Professional Math Library Track
+
+This is the long-term bar for turning Mensura from a compact spatial kernel
+into a professional-grade math library. These items are not all required for a
+0.1.x release, but they define what "world-class" would mean in this repo.
+
+### API Breadth
+
+- Keep the stable public core complete and boring:
+  `vec2/3/4`, `mat3/4`, `quat`, euler, dual-quat, transform compose,
+  transform decompose, inversion, look-at, projection, unprojection, and
+  affine transform helpers.
+- Keep shape primitives cohesive:
+  ray, plane, AABB, OBB, sphere, capsule, triangle, triangle mesh, frustum,
+  and support-mapped convex shape contracts.
+- Expand value-returning geometry queries before expanding orchestration:
+  closest point, distance, signed distance where meaningful, barycentric data,
+  hit data, contact normal, penetration depth, and time of impact.
+- Treat acceleration structures as their own layer:
+  median BVH, SAH BVH, refit, traversal, broadphase pair generation, and
+  stable query result ordering.
+- Add new primitives only when the layer contract is clear:
+  constructors in `geometry`, yes/no predicates in `query`, measurements in
+  `measure`, boundary checks in `validation`, and orchestration in `world`.
+
+### Numerical Stability
+
+- Document epsilon policy for every algorithm family that needs tolerances:
+  vector normalization, quaternion interpolation, matrix inversion,
+  ray/shape hits, SAT/GJK/EPA/MPR, CCD, and BVH bounds.
+- Keep degenerate cases explicit:
+  zero vectors, singular matrices, empty AABBs, degenerate triangles,
+  invalid capsules, zero-radius spheres, parallel rays, and coplanar or
+  touching collision cases.
+- Prefer `Result` for boundary-facing operations that can fail; reserve raw
+  sentinel behavior for documented hot-path primitives.
+- Maintain deterministic seed APIs and named RNG streams for fuzz,
+  stress-test, benchmark, and golden-data generation.
+- Keep random distributions selectable because uniform, gaussian,
+  triangular, boundary-heavy, and degenerate-biased inputs expose different
+  numerical failure modes.
+- Record the source or derivation for non-obvious numerical constants near the
+  policy export or in `docs/math-theory.md`.
+
+### Verification
+
+- Keep `test/golden/api-surface.json` and generated `.d.ts` symbol snapshots
+  as intentional public-surface gates.
+- Add and preserve golden fixtures for representative numeric outputs:
+  matrix projection, look-at, compose/decompose, quaternion interpolation,
+  ray/shape hits, frustum extraction, BVH traversal, CCD, and collision
+  contact data.
+- Grow the deterministic fuzz corpus over time instead of replacing it.
+  Failures should become named fixtures before the seed disappears.
+- Add differential tests against reference implementations where the contract
+  matches: gl-matrix for low-level vector/matrix kernels, wgpu-matrix for
+  WebGPU projection policy, and three.js math for selected geometry queries.
+- Add browser smoke coverage for real bundlers and runtimes:
+  Vite, esbuild-style resolution, ESM package exports, and WebGPU-adjacent
+  Float32Array/DataView upload paths.
+- Keep stress tests separate from fast unit tests, but make them easy to run
+  before release.
+
+### Performance
+
+- Maintain the three-tier performance model:
+  inspectable object API for ergonomics, `Into` APIs for allocation-free hot
+  paths, and `batch` / `unsafe` APIs for high-throughput loops.
+- Keep benchmark gates tied to measured reference baselines, not intuition.
+  When a threshold changes, record the reason in `docs/performance.md`.
+- Track long-running benchmark history so regressions can be separated from
+  host noise and V8 version changes.
+- Add benchmark cases for geometry and collision hot paths:
+  ray/AABB, ray/triangle, frustum/AABB, BVH traversal, broadphase pair
+  generation, GJK/MPR, EPA, and CCD.
+- Do not add WASM SIMD kernels until a real workload proves that JS unsafe
+  kernels are the bottleneck. If WASM ships, require documented memory
+  ownership, fallback behavior, generation steps, checksum/provenance, and
+  benchmark evidence.
+
+### Robust Geometry And Collision
+
+- Promote collision from experimental only after contact data and failure
+  contracts are covered by tests, fuzz, and docs.
+- Add stronger CCD coverage:
+  swept sphere/sphere, swept sphere/AABB, swept capsule, conservative
+  advancement where appropriate, initial-overlap policy, and grazing-contact
+  witnesses.
+- Add MPR contact recovery if `mprIntersect` becomes more than a binary query:
+  contact normal, penetration estimate, witness points, and iteration failure
+  semantics.
+- Add broadphase quality checks:
+  duplicate pair suppression, stable ordering, no self-pairs, disabled body
+  filtering, and deterministic output under repeated updates.
+- Add BVH quality checks:
+  SAH split correctness, median fallback behavior, empty input,
+  degenerate bounds, traversal ordering, and refit-vs-rebuild semantics.
+
+### Release And Trust
+
+- Keep `npm run check:release` as the single release gate.
+- Keep public source free of stubs, placeholders, and misleading TODO exports.
+- Keep package contents audited with `npm pack --dry-run`.
+- Keep DCO mandatory for all commits that enter the release branch.
+- Keep README claims tied to current code, current docs, and current benchmark
+  output.
+- Treat semver as part of the API contract:
+  no breaking stable-surface changes in patch releases, and no silent behavior
+  changes without docs and migration notes.
+- Prefer small, explicit layers over broad helper bags. New advanced features
+  should land behind a named layer or subpath when they change the package's
+  conceptual surface.
 
 ## Package Boundary
 

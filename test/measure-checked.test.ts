@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { vec3 } from "../src/core/index.js";
-import { aabb, aabbEmpty } from "../src/geometry/index.js";
+import { aabb, aabbEmpty, sphere } from "../src/geometry/index.js";
 import {
   aabbClosestPointChecked,
   aabbDistanceSqToPoint,
   aabbDistanceSqToPointChecked,
   aabbGetBoundingSphereChecked,
+  aabbSignedDistanceToPointChecked,
+  sphereSignedDistanceToPointChecked,
   triangleBarycentricChecked,
   triangleClosestPointChecked,
   triangleNormalChecked
@@ -41,6 +43,43 @@ describe("Result-first measure layer", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("MEASURE_EMPTY_DOMAIN");
+    }
+  });
+
+  it("computes signed AABB distance through the checked entry", () => {
+    const result = aabbSignedDistanceToPointChecked(aabb(vec3(-1, -1, -1), vec3(1, 1, 1)), vec3(3, 1, 1));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBeCloseTo(2, 12);
+    }
+  });
+
+  it("classifies empty AABB signed distance as MEASURE_EMPTY_DOMAIN", () => {
+    const result = aabbSignedDistanceToPointChecked(aabbEmpty(), vec3(0, 0, 0));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MEASURE_EMPTY_DOMAIN");
+    }
+  });
+
+  it("computes signed sphere distance through the checked entry", () => {
+    const result = sphereSignedDistanceToPointChecked(sphere(vec3(0, 0, 0), 2), vec3(0, 0, 5));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBeCloseTo(3, 12);
+    }
+  });
+
+  it("classifies invalid sphere signed distance through validation", () => {
+    const result = sphereSignedDistanceToPointChecked(sphere(vec3(0, 0, 0), -1), vec3(0, 0, 0));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_INVALID_RADIUS");
+      expect(result.error.stage).toBe("Measure");
     }
   });
 

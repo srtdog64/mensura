@@ -3,7 +3,8 @@ export {
   aabbClosestPointInto,
   aabbDistanceSqToPoint,
   aabbGetBoundingSphere,
-  aabbGetBoundingSphereInto
+  aabbGetBoundingSphereInto,
+  aabbSignedDistanceToPoint
 } from "../geometry/aabb.js";
 export {
   capsuleGetAabb,
@@ -21,6 +22,7 @@ export {
 export {
   sphereGetAabb,
   sphereGetAabbInto,
+  sphereSignedDistanceToPoint,
   sphereSurfaceArea,
   sphereVolume
 } from "../geometry/sphere.js";

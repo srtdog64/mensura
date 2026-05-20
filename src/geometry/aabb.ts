@@ -105,6 +105,34 @@ export function aabbDistanceSqToPoint(box: Aabb, point: Vec3): number {
 }
 
 /**
+ * Signed distance from `point` to the AABB surface. Negative values are inside
+ * the box, zero is on the boundary, and positive values are outside.
+ *
+ * Empty AABB returns `+Infinity`, matching `aabbDistanceSqToPoint`.
+ */
+export function aabbSignedDistanceToPoint(box: Aabb, point: Vec3): number {
+  if (aabbIsEmpty(box)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const cx = (box.min.x + box.max.x) * 0.5;
+  const cy = (box.min.y + box.max.y) * 0.5;
+  const cz = (box.min.z + box.max.z) * 0.5;
+  const hx = (box.max.x - box.min.x) * 0.5;
+  const hy = (box.max.y - box.min.y) * 0.5;
+  const hz = (box.max.z - box.min.z) * 0.5;
+  const qx = Math.abs(point.x - cx) - hx;
+  const qy = Math.abs(point.y - cy) - hy;
+  const qz = Math.abs(point.z - cz) - hz;
+  const ox = Math.max(qx, 0);
+  const oy = Math.max(qy, 0);
+  const oz = Math.max(qz, 0);
+  const outside = Math.sqrt(ox * ox + oy * oy + oz * oz);
+  const inside = Math.min(Math.max(qx, qy, qz), 0);
+  return outside + inside;
+}
+
+/**
  * Return an empty AABB (min = +Infinity, max = -Infinity). Combine with
  * `aabbExpandByPointInto` to grow a bounding box from a point sequence.
  */

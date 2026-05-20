@@ -23,10 +23,12 @@ import {
   rayObbHitDistance
 } from "../src/query/index.js";
 import {
+  aabbSignedDistanceToPoint,
   obbClosestPoint,
   obbGetAabb,
   obbGetCorners,
   sphereGetAabb,
+  sphereSignedDistanceToPoint,
   sphereSurfaceArea,
   sphereVolume
 } from "../src/measure/index.js";
@@ -60,6 +62,14 @@ describe("sphere measurements", () => {
     expect(sphereVolume(s)).toBeCloseTo((4 / 3) * Math.PI * 8, 10);
   });
 
+  it("computes signed distance to a sphere surface", () => {
+    const s = sphere(vec3(1, 0, 0), 2);
+
+    expect(sphereSignedDistanceToPoint(s, vec3(1, 0, 0))).toBeCloseTo(-2, 12);
+    expect(sphereSignedDistanceToPoint(s, vec3(3, 0, 0))).toBeCloseTo(0, 12);
+    expect(sphereSignedDistanceToPoint(s, vec3(6, 0, 0))).toBeCloseTo(3, 12);
+  });
+
   it("returns an empty AABB and zero area/volume for negative-radius sphere", () => {
     const empty = sphere(vec3(0, 0, 0), -1);
     const box = sphereGetAabb(empty);
@@ -68,6 +78,18 @@ describe("sphere measurements", () => {
     expect(box.max.x).toBe(Number.NEGATIVE_INFINITY);
     expect(sphereSurfaceArea(empty)).toBe(0);
     expect(sphereVolume(empty)).toBe(0);
+    expect(sphereSignedDistanceToPoint(empty, vec3(0, 0, 0))).toBe(Number.POSITIVE_INFINITY);
+  });
+});
+
+describe("AABB signed distance", () => {
+  it("computes negative, zero, and positive distances", () => {
+    const box = aabb(vec3(-1, -2, -3), vec3(1, 2, 3));
+
+    expect(aabbSignedDistanceToPoint(box, vec3(0, 0, 0))).toBeCloseTo(-1, 12);
+    expect(aabbSignedDistanceToPoint(box, vec3(1, 0, 0))).toBeCloseTo(0, 12);
+    expect(aabbSignedDistanceToPoint(box, vec3(4, 6, 3))).toBeCloseTo(5, 12);
+    expect(aabbSignedDistanceToPoint(aabbEmpty(), vec3(0, 0, 0))).toBe(Number.POSITIVE_INFINITY);
   });
 });
 

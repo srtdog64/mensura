@@ -139,6 +139,15 @@ Column-major, column-vector multiplication: `p' = M * p`. Index helper:
   `mat4Decompose(/Into) → Mat4DecomposedTrs`. `det < 0` matrices encode the
   reflection by flipping `scale.x`.
 
+- viewport mapping:
+  - `mat4ProjectPoint3WebGpu`/`Into` maps world/view points through a
+    world-view-projection matrix into top-down viewport pixel coordinates.
+    Output `z` is WebGPU clip depth `0..1`.
+  - `mat4UnprojectPoint3WebGpu`/`Into` maps viewport pixel coordinates plus
+    WebGPU clip depth back through a caller-provided inverse
+    world-view-projection matrix. Invalid viewport rectangles return
+    `VALIDATION_INVALID_FORMAT`.
+
 Projection matrices live in `@exornea/mensura/gpu`
 (`mat4PerspectiveWebGpuRh`).
 
@@ -196,7 +205,8 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 - predicates: `aabbContainsPoint`, `aabbIntersectsAabb` — boundary
   inclusive. Re-exported from `query`.
 - mutation / measurement: `aabbExpandByPoint`/`Into` (stays here because it
-  mutates the shape), `aabbClosestPoint`/`Into`, `aabbDistanceSqToPoint`
+  mutates the shape), `aabbClosestPoint`/`Into`, `aabbDistanceSqToPoint`,
+  `aabbSignedDistanceToPoint`
   (re-exported by `measure`). **`aabbDistanceSqToPoint` returns `+Infinity`
   for an empty AABB** (`dist(p, ∅) = +∞` by convention); `aabbClosestPoint`
   has no defined value for an empty input — reach for `measure/checked` to
@@ -214,7 +224,8 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
   `sphereIntersectsAabb`. All guard `radius < 0` → `false` (empty sphere
   overlaps nothing).
 - measurements: `sphereGetAabb(/Into)` (empty sphere → empty AABB),
-  `sphereSurfaceArea`, `sphereVolume`. Re-exported by `measure`.
+  `sphereSignedDistanceToPoint`, `sphereSurfaceArea`, `sphereVolume`.
+  Re-exported by `measure`.
 
 ### `plane.ts`
 
@@ -338,8 +349,10 @@ behaviour see `measure/checked` below.
 | Function | Empty / degenerate input | Returns |
 |---|---|---|
 | `aabbDistanceSqToPoint` | empty AABB | `+Infinity` |
+| `aabbSignedDistanceToPoint` | empty AABB | `+Infinity` |
 | `aabbClosestPoint` | empty AABB | undefined (no point exists) — use `measure/checked` |
 | `aabbGetBoundingSphere` | empty AABB | sphere with `radius = -1` |
+| `sphereSignedDistanceToPoint` | `radius < 0` | `+Infinity` |
 | `sphereContainsPoint` (geometry) | `radius < 0` | `false` |
 | `triangleNormal` | zero area | zero vector |
 | `triangleBarycentric` | zero area | `(1, 0, 0)` |

@@ -15,10 +15,12 @@ Mensura owns reusable math primitives:
 - vectors, quaternions, and matrices
 - rays, planes, AABBs, spheres, and frustums
 - intersection and overlap tests
+- closest-point, bounds, and signed-distance measurements
 - collision narrowphase (SAT, GJK, EPA, MPR, CCD) and acceleration structures
 - WGSL layout metadata and checked DataView projection
 - grid/world coordinate conversion
 - transform compose/decompose helpers
+- WebGPU viewport project/unproject helpers
 
 ## Coordinate And Memory Policy
 
@@ -190,6 +192,19 @@ console.log(rayAabbHitDistance(pickRay, bounds));
 
 Worked examples (camera+frustum, TRS compose/decompose, quaternion operations,
 Result-based error handling) live under [examples/](examples/).
+
+## Visual Ray Fixtures
+
+Ray hit tests can be inspected without adding browser or graphics dependencies:
+
+```sh
+npm run visual:ray
+```
+
+This builds the package and writes dependency-free SVG, 2D HTML, 3D Canvas
+HTML, and JSON manifest artifacts to `.mensura-visual/`. The artifacts are for
+human review; Vitest keeps a regression test that the rendered manifest values
+match the actual ray API calculations.
 
 ## Performance Snapshot
 

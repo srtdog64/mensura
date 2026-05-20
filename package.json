@@ -133,7 +133,8 @@
     "CONTRIBUTING.md",
     "DCO.md",
     "LICENSE",
-    "perf-benchmark.ts"
+    "perf-benchmark.ts",
+    "scripts/visual-ray-fixtures.mjs"
   ],
   "keywords": [
     "geometry",
@@ -175,7 +176,8 @@
     "release:stub-check": "node scripts/release-stub-check.mjs",
     "smoke:bundler": "tsc -p packages/bundler-smoke/tsconfig.json",
     "smoke:browser": "vite build --config packages/browser-smoke/vite.config.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "visual:ray": "npm run build && node scripts/visual-ray-fixtures.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

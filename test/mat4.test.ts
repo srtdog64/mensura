@@ -8,11 +8,13 @@ import {
   mat4Invert,
   mat4LookAtRh,
   mat4Multiply,
+  mat4ProjectPoint3WebGpu,
   mat4Scaling,
   mat4TransformAffinePoint3,
   mat4TransformDirection3,
   mat4TransformPoint3,
   mat4Translation,
+  mat4UnprojectPoint3WebGpu,
   nearlyEqualAbsRel,
   quat,
   unwrap,
@@ -49,6 +51,33 @@ describe("Mat4", () => {
 
     expect(nearlyEqualAbsRel(near.z, 0)).toBe(true);
     expect(nearlyEqualAbsRel(far.z, 1)).toBe(true);
+  });
+
+  it("projects and unprojects WebGPU viewport-space points", () => {
+    const projection = unwrap(mat4PerspectiveWebGpuRh(Math.PI / 2, 1, 1, 10));
+    const inverse = unwrap(mat4Invert(projection));
+    const viewport = { x: 10, y: 20, width: 800, height: 600 };
+
+    const projected = unwrap(mat4ProjectPoint3WebGpu(projection, vec3(0.5, 0.25, -5), viewport));
+    expect(projected.x).toBeCloseTo(450, 12);
+    expect(projected.y).toBeCloseTo(305, 12);
+    expect(projected.z).toBeCloseTo(8 / 9, 12);
+
+    const unprojected = unwrap(mat4UnprojectPoint3WebGpu(inverse, projected, viewport));
+    expect(unprojected.x).toBeCloseTo(0.5, 12);
+    expect(unprojected.y).toBeCloseTo(0.25, 12);
+    expect(unprojected.z).toBeCloseTo(-5, 12);
+  });
+
+  it("rejects invalid WebGPU viewport projection inputs", () => {
+    const projection = unwrap(mat4PerspectiveWebGpuRh(Math.PI / 2, 1, 1, 10));
+    const result = mat4ProjectPoint3WebGpu(projection, vec3(0, 0, -1), { x: 0, y: 0, width: 0, height: 600 });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_INVALID_FORMAT");
+      expect(result.error.stage).toBe("ValidateInput");
+    }
   });
 
   it("writes and reads packed Float32Array matrices", () => {

@@ -72,6 +72,58 @@ the region where the hyperbolic projection wastes less practical precision.
 Mensura's reverse-Z WebGPU form uses the same coordinate policy and validates
 finite finite-far divisions separately from the `far = Infinity` branch.
 
+### Viewport Project / Unproject
+
+`mat4ProjectPoint3WebGpu` applies the world-view-projection matrix, performs
+the homogeneous w-divide, then maps WebGPU NDC to top-down viewport pixels:
+
+```txt
+screen.x = viewport.x + (ndc.x + 1) * 0.5 * viewport.width
+screen.y = viewport.y + (1 - ndc.y) * 0.5 * viewport.height
+screen.z = ndc.z
+```
+
+`mat4UnprojectPoint3WebGpu` performs the inverse mapping with a
+caller-provided inverse world-view-projection matrix:
+
+```txt
+ndc.x = ((screen.x - viewport.x) / viewport.width) * 2 - 1
+ndc.y = 1 - ((screen.y - viewport.y) / viewport.height) * 2
+ndc.z = screen.z
+world = inverseWvp * vec4(ndc, 1)
+```
+
+The API asks the caller for the inverse matrix so a picking path can invert
+once per camera update instead of once per point.
+
+### Signed Distance Helpers
+
+Signed distance helpers use the common convention:
+
+```txt
+negative = point is inside the shape
+zero     = point lies on the boundary
+positive = point is outside the shape
+```
+
+For a sphere:
+
+```txt
+sdSphere(p) = |p - center| - radius
+```
+
+For an AABB, Mensura uses the standard box signed-distance form with
+`q = abs(p - center) - halfExtent`:
+
+```txt
+outside = length(max(q, 0))
+inside  = min(max(q.x, q.y, q.z), 0)
+sdAabb  = outside + inside
+```
+
+Empty AABBs and negative-radius spheres return `+Infinity`, preserving the
+existing "empty domains overlap nothing" convention.
+
 ---
 
 ## 3. Empty Domains
