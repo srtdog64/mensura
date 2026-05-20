@@ -41,6 +41,7 @@ export function createRayVisualFixtures(api) {
   const targetCapsule = capsule(vec3(0, 0, -6), vec3(0, 0, -3), 0.5);
   const capsuleRay = ray(vec3(2, 0, -4.5), vec3(-1, 0, 0));
   const capsuleHit = rayCapsuleHit(capsuleRay, targetCapsule);
+  const capsuleDebug = capsuleHit ? capsuleHitDebug(targetCapsule, capsuleHit.point) : undefined;
 
   const fixtures = [
     {
@@ -76,7 +77,7 @@ export function createRayVisualFixtures(api) {
       shapes: [{ kind: "triangle", value: [triA, triB, triC] }],
       note: "ray direction is -Z through this XY plane",
       summary: triangleHit
-        ? `t=${fmt(triangleHit.distance)}, bary=(${fmt(triangleHit.barycentric.x)}, ${fmt(triangleHit.barycentric.y)}, ${fmt(triangleHit.barycentric.z)})`
+        ? `t=${fmt(triangleHit.distance)}, bary=(${fmtBary(triangleHit.barycentric.x)}, ${fmtBary(triangleHit.barycentric.y)}, ${fmtBary(triangleHit.barycentric.z)})`
         : "miss"
     },
     {
@@ -88,7 +89,10 @@ export function createRayVisualFixtures(api) {
       ray: capsuleRay,
       hit: capsuleHit,
       shapes: [{ kind: "capsule", value: targetCapsule }],
-      summary: hitSummary(capsuleHit)
+      debug: capsuleDebug,
+      summary: capsuleHit && capsuleDebug
+        ? `${hitSummary(capsuleHit)}, part=${capsuleDebug.hitPart}`
+        : hitSummary(capsuleHit)
     }
   ];
 
@@ -314,6 +318,8 @@ function drawCapsule(cap) {
   line(cap.point0, cap.point1);
   drawSphere({ center: cap.point0, radius: cap.radius });
   drawSphere({ center: cap.point1, radius: cap.radius });
+  labelPoint(cap.point0, "A", "#0f766e", -18, 16);
+  labelPoint(cap.point1, "B", "#0f766e", -18, 22);
 }
 
 function drawRay(fixture) {
@@ -338,8 +344,14 @@ function drawHitGuide(fixture) {
       drawCenterToHit(shape.value.center, fixture.hit.point);
     }
     if (shape.kind === "capsule") {
-      const closest = closestPointOnSegment(shape.value.point0, shape.value.point1, fixture.hit.point);
+      const closest = fixture.debug?.closestPoint || closestPointOnSegment(shape.value.point0, shape.value.point1, fixture.hit.point);
       drawCenterToHit(closest, fixture.hit.point);
+      if (fixture.debug?.normal) {
+        drawNormal(fixture.hit.point, fixture.debug.normal);
+      }
+      if (fixture.debug?.hitPart) {
+        labelPoint(fixture.hit.point, fixture.debug.hitPart, "#ef4444", 10, -10);
+      }
     }
   }
 }
@@ -352,6 +364,23 @@ function drawCenterToHit(center, hitPoint) {
   line(center, hitPoint);
   ctx.restore();
   drawPoint(center, "#f97316", 4);
+}
+
+function drawNormal(origin, normal) {
+  ctx.save();
+  ctx.strokeStyle = "#9333ea";
+  ctx.lineWidth = 1.75;
+  line(origin, add(origin, scale(normal, 0.45)));
+  ctx.restore();
+}
+
+function labelPoint(point, text, color, dx, dy) {
+  const p = project(point);
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = "700 13px Inter, Segoe UI, Arial";
+  ctx.fillText(text, p.x + dx, p.y + dy);
+  ctx.restore();
 }
 
 function closestPointOnSegment(a, b, p) {
@@ -579,6 +608,61 @@ function getAxis(value, axis) {
   return value[axis];
 }
 
+function capsuleHitDebug(capsule, point) {
+  const closest = capsuleClosestPointOnSegment(capsule.point0, capsule.point1, point);
+  const axis = {
+    x: capsule.point1.x - capsule.point0.x,
+    y: capsule.point1.y - capsule.point0.y,
+    z: capsule.point1.z - capsule.point0.z
+  };
+  const denom = axis.x * axis.x + axis.y * axis.y + axis.z * axis.z;
+  const rawT = denom === 0
+    ? 0
+    : ((point.x - capsule.point0.x) * axis.x + (point.y - capsule.point0.y) * axis.y + (point.z - capsule.point0.z) * axis.z) / denom;
+  const t = Math.max(0, Math.min(1, rawT));
+  const normal = normalizeVec3({
+    x: point.x - closest.x,
+    y: point.y - closest.y,
+    z: point.z - closest.z
+  });
+
+  return {
+    segmentA: capsule.point0,
+    segmentB: capsule.point1,
+    closestPoint: closest,
+    normal,
+    hitPart: t <= 0 ? "CapA" : t >= 1 ? "CapB" : "Body"
+  };
+}
+
+function capsuleClosestPointOnSegment(a, b, point) {
+  const ab = {
+    x: b.x - a.x,
+    y: b.y - a.y,
+    z: b.z - a.z
+  };
+  const ap = {
+    x: point.x - a.x,
+    y: point.y - a.y,
+    z: point.z - a.z
+  };
+  const denom = ab.x * ab.x + ab.y * ab.y + ab.z * ab.z;
+  const rawT = denom === 0 ? 0 : (ap.x * ab.x + ap.y * ab.y + ap.z * ab.z) / denom;
+  const t = Math.max(0, Math.min(1, rawT));
+
+  return {
+    x: a.x + ab.x * t,
+    y: a.y + ab.y * t,
+    z: a.z + ab.z * t
+  };
+}
+
+function normalizeVec3(value) {
+  const len = Math.hypot(value.x, value.y, value.z);
+  if (len === 0) return { x: 0, y: 0, z: 0 };
+  return { x: value.x / len, y: value.y / len, z: value.z / len };
+}
+
 function hitSummary(hit) {
   if (!hit) return "miss";
   return `t=${fmt(hit.distance)}, p=(${fmt(hit.point.x)}, ${fmt(hit.point.y)}, ${fmt(hit.point.z)})`;
@@ -586,6 +670,10 @@ function hitSummary(hit) {
 
 function fmt(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(3);
+}
+
+function fmtBary(value) {
+  return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function baseCss() {
