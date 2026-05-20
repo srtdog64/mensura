@@ -165,7 +165,7 @@
     "clean:all": "npm run clean && npm run clean:experimental",
     "clean:experimental": "node -e \"const fs=require('fs'); fs.rmSync('dist-experimental',{recursive:true,force:true}); fs.rmSync('tsconfig.experimental.tsbuildinfo',{force:true});\"",
     "check": "npm run build && npm test && npm run pack:check",
-    "check:contracts": "npm run build && npm run build:experimental && npm run api:snapshot && npm run smoke:examples && npm run smoke:bundler && npm run smoke:browser",
+    "check:contracts": "npm run build && npm run build:experimental && npm run api:snapshot && npm run smoke:examples && npm run smoke:bundler && npm run smoke:browser && npm run smoke:perf-types",
     "check:release": "npm run release:stub-check && npm run dco:check && npm run check && npm run check:contracts && npm run benchmark:check",
     "dco:check": "node scripts/dco-check.mjs",
     "example:collision": "npm run build && node examples/collision-source-of-truth.mjs",
@@ -179,6 +179,7 @@
     "smoke:examples": "node examples/collision-source-of-truth.mjs && node examples/geukbit-viewport-dogfood.mjs",
     "smoke:bundler": "tsc -p packages/bundler-smoke/tsconfig.json",
     "smoke:browser": "vite build --config packages/browser-smoke/vite.config.mjs",
+    "smoke:perf-types": "tsc --noEmit --module NodeNext --moduleResolution NodeNext --target es2022 --lib es2022,dom --strict --exactOptionalPropertyTypes perf-benchmark.ts",
     "test": "vitest run",
     "visual:ray": "npm run build && node examples/visual-ray-fixtures.mjs"
   },

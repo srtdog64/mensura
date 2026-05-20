@@ -2,16 +2,23 @@ import { buildBvh } from "./dist/accel/index.js";
 import { CollisionContext, mprIntersect } from "./dist/collision/index.js";
 import {
   add3Into,
+  lengthSq3,
+  mat4Copy,
   mat4MultiplyInto,
   mat4Translation,
   mutableVec3,
-  normalize3,
   normalize3Into,
-  scaleAndAdd3,
   vec3
 } from "./dist/core/index.js";
 import { aabb, ray } from "./dist/geometry/index.js";
 import { rayAabbHitDistance } from "./dist/query/index.js";
+
+declare const process: {
+  readonly version: string;
+  readonly versions: {
+    readonly v8: string;
+  };
+};
 
 // Focused smoke benchmark for humans. `benchmark-runner.js` owns release
 // gates; this file stays shorter and uses enough operations to rise above
@@ -67,7 +74,7 @@ function main(): void {
   // Mat4 multiply performs substantially more arithmetic than a vec3 op, so
   // use fewer iterations to keep this focused benchmark interactive.
   bench("mat4 multiplyInto", COUNT / 8, () => {
-    const out = matrices[0].slice();
+    const out = mat4Copy(matrices[0]);
     for (let i = 0; i < COUNT / 8; i++) {
       mat4MultiplyInto(matrices[i & 127], matrices[(i + 31) & 127], out);
       checksum += out[12];
@@ -86,8 +93,8 @@ function main(): void {
   bench("MPR sphere/sphere", COUNT / 16, () => {
     for (let i = 0; i < COUNT / 16; i++) {
       const result = mprIntersect(
-        { center: vec3(0, 0, 0), support: supportA },
-        { center: vec3(0.75, 0.25, 0), support: supportB },
+        { center: vec3(0, 0, 0), supportInto: supportA },
+        { center: vec3(0.75, 0.25, 0), supportInto: supportB },
         ctx
       );
       checksum += result.ok && result.value.intersect ? 1 : 0;
@@ -124,9 +131,20 @@ function bench(name: string, operations: number, fn: () => void): void {
 }
 
 function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
-  return (direction: ReturnType<typeof vec3>) => {
-    const normalized = normalize3(direction);
-    return scaleAndAdd3(center, normalized, radius);
+  return (direction: ReturnType<typeof vec3>, out: ReturnType<typeof mutableVec3>) => {
+    const lenSq = lengthSq3(direction);
+    if (lenSq === 0) {
+      out.x = center.x + radius;
+      out.y = center.y;
+      out.z = center.z;
+      return out;
+    }
+
+    const scale = radius / Math.sqrt(lenSq);
+    out.x = center.x + direction.x * scale;
+    out.y = center.y + direction.y * scale;
+    out.z = center.z + direction.z * scale;
+    return out;
   };
 }
 

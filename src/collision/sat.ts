@@ -47,9 +47,10 @@ function testObbObbSatInternal(a: Obb, b: Obb, ctx: CollisionContext, trace?: Sa
 
   // 3 axes from A
   for (let i = 0; i < 3; i++) {
-    const rA = a.extents.x * Math.abs(dot3(ctx.satAAxes[i], ctx.satAAxes[0])) +
-               a.extents.y * Math.abs(dot3(ctx.satAAxes[i], ctx.satAAxes[1])) +
-               a.extents.z * Math.abs(dot3(ctx.satAAxes[i], ctx.satAAxes[2]));
+    // OBB rotation columns are unit local axes, so a box projected onto its
+    // own primary axis has radius equal to that axis extent. The other box
+    // still needs the full projected-radius sum.
+    const rA = i === 0 ? a.extents.x : (i === 1 ? a.extents.y : a.extents.z);
     const rB = b.extents.x * Math.abs(dot3(ctx.satAAxes[i], ctx.satBAxes[0])) +
                b.extents.y * Math.abs(dot3(ctx.satAAxes[i], ctx.satBAxes[1])) +
                b.extents.z * Math.abs(dot3(ctx.satAAxes[i], ctx.satBAxes[2]));
@@ -62,9 +63,8 @@ function testObbObbSatInternal(a: Obb, b: Obb, ctx: CollisionContext, trace?: Sa
     const rA = a.extents.x * Math.abs(dot3(ctx.satBAxes[i], ctx.satAAxes[0])) +
                a.extents.y * Math.abs(dot3(ctx.satBAxes[i], ctx.satAAxes[1])) +
                a.extents.z * Math.abs(dot3(ctx.satBAxes[i], ctx.satAAxes[2]));
-    const rB = b.extents.x * Math.abs(dot3(ctx.satBAxes[i], ctx.satBAxes[0])) +
-               b.extents.y * Math.abs(dot3(ctx.satBAxes[i], ctx.satBAxes[1])) +
-               b.extents.z * Math.abs(dot3(ctx.satBAxes[i], ctx.satBAxes[2]));
+    // Symmetric primary-axis case for B; avoid re-projecting B onto itself.
+    const rB = i === 0 ? b.extents.x : (i === 1 ? b.extents.y : b.extents.z);
     const distance = Math.abs(dot3(ctx.satT, ctx.satBAxes[i]));
     if (emitAxisTrace(trace, "b", undefined, i, distance, rA, rB)) return false;
   }
