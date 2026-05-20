@@ -23,6 +23,10 @@ specific example with `tsx`, `ts-node`, or after `tsc` against
 - [batch-and-unsafe.ts](batch-and-unsafe.ts): batch `*IntoMany` over semantic
   Vec3 objects vs `unsafe/*F32Many` over packed `Float32Array` /
   `SharedArrayBuffer`. Rule-of-thumb decision table at the bottom.
+- [collision-source-of-truth.mjs](collision-source-of-truth.mjs): runnable
+  support-mapped collision example. It keeps GJK/MPR as the single canonical
+  implementation and treats shape setup, assertions, workers, and visuals as
+  adapters around that path.
 - [shared-array-buffer-worker.ts](shared-array-buffer-worker.ts): worker
   handoff over `SharedArrayBuffer` with caller-owned `Atomics` publication.
   Mensura kernels run on shared memory; the host owns synchronization.

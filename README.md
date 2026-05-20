@@ -191,8 +191,14 @@ console.log(rayAabbHitDistance(pickRay, bounds));
 ```
 
 Worked examples (camera+frustum, TRS compose/decompose, quaternion operations,
-Result-based error handling, and visual ray fixtures) live under
+Result-based error handling, collision source-of-truth flow, and visual ray fixtures) live under
 [examples/](examples/).
+
+Run the collision example after a build:
+
+```sh
+npm run example:collision
+```
 
 ## Visual Ray Fixtures
 

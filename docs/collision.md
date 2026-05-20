@@ -13,6 +13,35 @@ The collision layer is intentionally narrow:
 - It uses caller-owned contexts for scratch memory. A context is not reentrant
   and must not be shared by concurrent callers.
 
+## Source Of Truth Policy
+
+Complex collision algorithms have one canonical implementation. For GJK and
+MPR that implementation is the support-mapped path:
+
+```txt
+shape data -> support function -> CollisionContext -> gjk/mprIntersect -> Result
+```
+
+`examples/collision-source-of-truth.mjs` is the public witness for that policy.
+It builds simple convex shapes, supplies support functions, and routes every
+decision through `gjk` or `mprIntersect`.
+
+Do not create separate batch or unsafe copies of GJK, EPA, MPR, CCD, BVH
+traversal, or broadphase pair generation. Those algorithms have too much state
+and too many boundary conventions to keep multiple hand-written versions in
+sync. If a future caller needs packed memory, worker handoff, or visualization,
+add a thin adapter that prepares shape data and then calls the canonical
+algorithm.
+
+Small leaf kernels are the exception. `vec3`, `mat4`, and `quat` may expose
+`foo`, `fooInto`, batch, and `unsafe` variants when benchmark gates justify the
+duplication. That exception does not extend to complex collision logic.
+
+Unsafe collision paths are release-blocked until a real benchmark proves that
+the canonical path is the bottleneck, records the Node/V8 version, and keeps a
+tested fallback. Measurement is the only justification for adding `unsafe`
+collision code.
+
 ## Boundary Policy
 
 Different algorithms use different mathematical boundary conventions. Mensura

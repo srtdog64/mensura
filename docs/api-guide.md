@@ -88,6 +88,12 @@ loops use `@exornea/mensura/batch` (object arrays) or
 Plain `{x, y, z}` so values are inspectable. Hot paths take an `Into`
 output. Aliasing is safe (`fooInto(a, b, a)` works).
 
+`readonly Vec3` and `MutableVec3` are TypeScript contracts, not runtime
+immutability. They help call sites express intent, but both are plain JavaScript
+objects at runtime. Do not treat `readonly` as a security boundary. Use
+validation, cloning, or debug-only freezing at API boundaries when mutation
+must be detected; keep the hot math path unfrozen.
+
 - ctor / constants: `vec3`, `mutableVec3`, `set3`, `copy3`/`copy3Into`,
   `VEC3_ZERO/ONE/UP/FORWARD/RIGHT`.
 - arithmetic: `add3`/`Into`, `sub3`/`Into`, `scale3`/`Into`,
