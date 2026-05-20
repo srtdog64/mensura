@@ -40,11 +40,16 @@ These layers are public enough to dogfood, but not yet stable enough to freeze:
 | `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA/MPR/CCD witnesses are in place for common overlap, separation, touching-boundary, iteration-budget, and penetration-recovery cases. `CollisionContext` owns scratch plus numeric policy, support-mapped hot paths use `SupportFunctionInto`, `testObbObbSatTrace` is the explicit diagnostic path, and `GjkResult` exposes `simplex` and `simplexSize` as a context-owned view. Remaining: broader randomized convex support-map coverage and MPR penetration/contact recovery. |
 | `@exornea/mensura/accel` | Experimental | BVH behavior is tested, but builder policy and traversal result contracts may still change. |
 | `@exornea/mensura/world` | Experimental | Useful orchestration layer, but body lifecycle and broadphase ownership are not finalized. |
-| `@exornea/mensura/physics` | Compatibility | Re-export facade for older imports. Do not add new primary APIs here. |
+| `@exornea/mensura/physics` | Legacy compatibility | Re-export facade for older imports. Do not add new primary APIs here; new code should import `query`, `collision`, `accel`, or `world` by responsibility. |
 | `@exornea/mensura/wasm` | Experimental | Feature-probe layer for WebAssembly SIMD. No binary kernel is shipped until memory ownership, fallback behavior, generation steps, and provenance are documented. |
 
 Experimental APIs should remain tested, but callers should expect naming,
 result-shape, and policy changes before a stable release.
+
+Layer entry points are canonical without `/index`. For example, use
+`@exornea/mensura/collision`, not `@exornea/mensura/collision/index`; the
+package export map blocks those duplicate names so one layer has one public
+import spelling.
 
 ## Contract Gates
 

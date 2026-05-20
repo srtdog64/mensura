@@ -56,7 +56,7 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 ## Module Layout
 
 ```txt
-@exornea/mensura           facade for the whole kernel
+@exornea/mensura           facade for the stable kernel surface
 @exornea/mensura/core      float, vector, and matrix math
 @exornea/mensura/geometry  shape primitives: rays, planes, bounds, spheres
 @exornea/mensura/query     ray hits, overlap tests, frustum culling
@@ -90,8 +90,8 @@ See [Math Theory](docs/math-theory.md) for the formulas behind float32 loss,
 empty-domain sentinels, RNG algorithms, sampling distributions, geometric
 samplers, and bias diagnostics.
 
-The root facade exports the primary layers. `physics` remains as a compatibility
-facade for older imports, but new code should import `query`, `collision`,
+The root facade exports the stable primary layers. `physics` remains as a legacy
+compatibility facade for older imports, but new code should import `query`, `collision`,
 `accel`, and `world` by responsibility. `measure` owns derived primitive
 measurements and projections such as AABB closest points, capsule bounds,
 triangle normals, areas, barycentric coordinates, and triangle closest points.
@@ -252,7 +252,8 @@ Selected release-gated results:
 | `unsafeVec3CrossF32Many` | 524.4M ops/s | `cross3IntoMany` 272.2M ops/s | 1.93x |
 
 `npm run benchmark` is the authoritative comparison harness used by
-`benchmark:check`. A smaller focused local probe is also committed:
+`benchmark:check`. `perf-benchmark.ts` is only a smaller focused local probe,
+not the release gate:
 
 ```sh
 npm run build

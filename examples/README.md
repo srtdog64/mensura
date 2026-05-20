@@ -1,9 +1,10 @@
 # Mensura Examples
 
 Runnable TypeScript snippets that show the intended API shape. Each file is
-self-contained and uses the published entry points (`@exornea/mensura/core`,
-`@exornea/mensura/geometry`, `@exornea/mensura/gpu`) so that the same code
-works for downstream consumers.
+self-contained and uses the published layer entry points so that the same code
+works for downstream consumers. Examples use the canonical layer names such as
+`@exornea/mensura/core` and `@exornea/mensura/collision`; they do not use
+duplicate `/index` subpath spellings.
 
 The examples folder is **not** included in `tsc -p tsconfig.json`
 (see `tsconfig.json` `include`), so it does not affect library builds. Run a

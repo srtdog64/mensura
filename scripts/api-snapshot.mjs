@@ -44,18 +44,31 @@ function collectSurface() {
 
 function collectDtsSymbols(exportsMap) {
   const entries = {};
+  const blockedExports = new Set(
+    Object.entries(exportsMap)
+      .filter(([, target]) => target === null)
+      .map(([exportName]) => exportName)
+  );
+
   for (const exportName of Object.keys(exportsMap).sort()) {
     if (exportName === "./package.json") {
       continue;
     }
 
     const target = exportsMap[exportName];
+    if (target === null) {
+      continue;
+    }
     const typeTarget = typeof target === "string" ? null : target.types;
     if (!typeTarget) {
       continue;
     }
 
     for (const concrete of expandExportTarget(exportName, typeTarget)) {
+      if (blockedExports.has(concrete.exportName)) {
+        continue;
+      }
+
       if (!existsSync(concrete.path)) {
         entries[concrete.exportName] = ["missing:dts"];
         continue;
@@ -84,8 +97,8 @@ function expandExportTarget(exportName, typeTarget) {
 
   const prefix = typeTarget.slice(0, starIndex);
   const suffix = typeTarget.slice(starIndex + 1);
-  const dir = resolve(dirname(prefix));
-  const filePrefix = prefix.slice(prefix.lastIndexOf("/") + 1);
+  const dir = resolve(prefix.endsWith("/") ? prefix : dirname(prefix));
+  const filePrefix = prefix.endsWith("/") ? "" : prefix.slice(prefix.lastIndexOf("/") + 1);
   const files = readdirSync(dir)
     .filter((name) => name.startsWith(filePrefix) && name.endsWith(suffix))
     .sort();

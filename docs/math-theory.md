@@ -432,7 +432,9 @@ same strict boundary policy as `gjk`: exact touching is not positive overlap.
 The Mensura contract is intentionally narrower than full contact generation:
 
 - Input is two convex support-mapped shapes, each with a caller-provided
-  interior point (`center`) and `support(direction)`.
+  interior point (`center`) and `supportInto(direction, out)`. Allocating
+  support helpers may exist inside host adapters, but they are not Mensura's
+  public collision contract.
 - Output is a boolean intersection decision plus diagnostic portal data.
 - `portalDirection` is a refined portal-face direction only when
   `portalRefined` is `true`; early exits and degenerate portal cases report

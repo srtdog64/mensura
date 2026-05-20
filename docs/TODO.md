@@ -305,8 +305,9 @@ into a professional-grade math library. These items are not all required for a
 - Promote collision from experimental only after contact data and failure
   contracts are covered by tests, fuzz, and docs.
 - Keep support-mapped collision ownership explicit. New support-map APIs should
-  prefer `SupportFunctionInto`; returning `Vec3` from a support function is a
-  convenience path, not the canonical hot loop.
+  use `SupportFunctionInto`. Returning `Vec3` from a support function may exist
+  inside a host-local adapter, but it must not become a second public Mensura
+  collision contract.
 - Add stronger CCD coverage:
   swept sphere/sphere, swept sphere/AABB, swept capsule, conservative
   advancement where appropriate, initial-overlap policy, and grazing-contact

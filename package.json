@@ -16,6 +16,7 @@
       "types": "./dist/core/index.d.ts",
       "default": "./dist/core/index.js"
     },
+    "./core/index": null,
     "./core/*": {
       "types": "./dist/core/*.d.ts",
       "default": "./dist/core/*.js"
@@ -24,6 +25,7 @@
       "types": "./dist/geometry/index.d.ts",
       "default": "./dist/geometry/index.js"
     },
+    "./geometry/index": null,
     "./geometry/*": {
       "types": "./dist/geometry/*.d.ts",
       "default": "./dist/geometry/*.js"
@@ -32,6 +34,7 @@
       "types": "./dist/query/index.d.ts",
       "default": "./dist/query/index.js"
     },
+    "./query/index": null,
     "./query/*": {
       "types": "./dist/query/*.d.ts",
       "default": "./dist/query/*.js"
@@ -40,6 +43,7 @@
       "types": "./dist/collision/index.d.ts",
       "default": "./dist/collision/index.js"
     },
+    "./collision/index": null,
     "./collision/*": {
       "types": "./dist/collision/*.d.ts",
       "default": "./dist/collision/*.js"
@@ -48,6 +52,7 @@
       "types": "./dist/accel/index.d.ts",
       "default": "./dist/accel/index.js"
     },
+    "./accel/index": null,
     "./accel/*": {
       "types": "./dist/accel/*.d.ts",
       "default": "./dist/accel/*.js"
@@ -56,6 +61,7 @@
       "types": "./dist/world/index.d.ts",
       "default": "./dist/world/index.js"
     },
+    "./world/index": null,
     "./world/*": {
       "types": "./dist/world/*.d.ts",
       "default": "./dist/world/*.js"
@@ -64,6 +70,7 @@
       "types": "./dist/layout/index.d.ts",
       "default": "./dist/layout/index.js"
     },
+    "./layout/index": null,
     "./layout/*": {
       "types": "./dist/layout/*.d.ts",
       "default": "./dist/layout/*.js"
@@ -72,6 +79,7 @@
       "types": "./dist/data/index.d.ts",
       "default": "./dist/data/index.js"
     },
+    "./data/index": null,
     "./data/*": {
       "types": "./dist/data/*.d.ts",
       "default": "./dist/data/*.js"
@@ -80,6 +88,7 @@
       "types": "./dist/measure/index.d.ts",
       "default": "./dist/measure/index.js"
     },
+    "./measure/index": null,
     "./measure/*": {
       "types": "./dist/measure/*.d.ts",
       "default": "./dist/measure/*.js"
@@ -88,6 +97,7 @@
       "types": "./dist/validation/index.d.ts",
       "default": "./dist/validation/index.js"
     },
+    "./validation/index": null,
     "./validation/*": {
       "types": "./dist/validation/*.d.ts",
       "default": "./dist/validation/*.js"
@@ -96,6 +106,7 @@
       "types": "./dist/batch/index.d.ts",
       "default": "./dist/batch/index.js"
     },
+    "./batch/index": null,
     "./batch/*": {
       "types": "./dist/batch/*.d.ts",
       "default": "./dist/batch/*.js"
@@ -108,6 +119,7 @@
       "types": "./dist/gpu/index.d.ts",
       "default": "./dist/gpu/index.js"
     },
+    "./gpu/index": null,
     "./gpu/*": {
       "types": "./dist/gpu/*.d.ts",
       "default": "./dist/gpu/*.js"
@@ -116,6 +128,7 @@
       "types": "./dist/unsafe/index.d.ts",
       "default": "./dist/unsafe/index.js"
     },
+    "./unsafe/index": null,
     "./unsafe/*": {
       "types": "./dist/unsafe/*.d.ts",
       "default": "./dist/unsafe/*.js"
