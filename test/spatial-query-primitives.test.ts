@@ -15,11 +15,14 @@ import {
   visitGridCellsForAabb,
   worldToGrid
 } from "../src/geometry/index.js";
+import { mutableVec3 } from "../src/core/index.js";
 import {
   nearestRayAabbHit,
   overlapManyAabb,
   overlapManyAabbInto,
-  raycastManyAabb
+  raycastManyAabb,
+  raycastManyAabbInto,
+  type MutableIndexedRayHit
 } from "../src/query/index.js";
 import {
   sweptAabbHit,
@@ -42,6 +45,37 @@ describe("pure indexed AABB query primitives", () => {
     expect(nearest?.index).toBe(1);
     expect(nearest?.distance).toBe(2);
     expect(nearest?.point).toEqual(vec3(0, 0, -2));
+  });
+
+  it("reuses caller-owned MutableIndexedRayHit slots across calls", () => {
+    const boxes = [
+      aabb(vec3(-1, -1, -6), vec3(1, 1, -4)),
+      aabb(vec3(-1, -1, -3), vec3(1, 1, -2)),
+      aabb(vec3(4, 4, -6), vec3(5, 5, -4))
+    ];
+    const out: MutableIndexedRayHit[] = [
+      { index: -1, distance: 0, point: mutableVec3() },
+      { index: -1, distance: 0, point: mutableVec3() },
+      { index: -1, distance: 0, point: mutableVec3() }
+    ];
+    const slotRefs = [out[0], out[1], out[2]];
+    const pointRefs = [out[0].point, out[1].point, out[2].point];
+
+    const first = raycastManyAabbInto(ray(vec3(0, 0, 0), vec3(0, 0, -1)), boxes, out);
+
+    expect(first).toBe(out);
+    expect(first.length).toBe(2);
+    expect(out[0]).toBe(slotRefs[0]);
+    expect(out[1]).toBe(slotRefs[1]);
+    expect(out[0].point).toBe(pointRefs[0]);
+    expect(out[1].point).toBe(pointRefs[1]);
+    expect(out.map((h) => h.index)).toEqual([0, 1]);
+
+    // A second call against a smaller hit set must shorten `length` but keep
+    // the slot objects intact for further reuse.
+    const second = raycastManyAabbInto(ray(vec3(10, 0, 0), vec3(0, 0, -1)), boxes, out);
+    expect(second).toBe(out);
+    expect(second.length).toBe(0);
   });
 
   it("emits canonical overlap pairs for many AABBs", () => {
@@ -89,13 +123,13 @@ describe("capsule-capsule measurements", () => {
     expect(capsuleCapsuleSignedDistance(a, overlapping)).toBeCloseTo(-0.25, 12);
     expect(contact?.intersects).toBe(false);
     expect(contact?.normal).toEqual(vec3(1, 0, 0));
-    expect(contact?.point0).toEqual(vec3(0.5, 0, 0));
-    expect(contact?.point1).toEqual(vec3(1.75, 0, 0));
+    expect(contact?.surfacePoint0).toEqual(vec3(0.5, 0, 0));
+    expect(contact?.surfacePoint1).toEqual(vec3(1.75, 0, 0));
   });
 });
 
 describe("rich sweep hit results", () => {
-  it("adds point, remaining motion, and overlap metadata to AABB and sphere sweeps", () => {
+  it("adds point, remaining motion, and initial-contact metadata to AABB and sphere sweeps", () => {
     const aabbHit = sweptAabbHit(
       aabb(vec3(0, 0, 0), vec3(1, 1, 1)),
       vec3(4, 0, 0),
@@ -115,14 +149,14 @@ describe("rich sweep hit results", () => {
     expect(aabbHit?.time).toBeCloseTo(0.5, 12);
     expect(aabbHit?.point).toEqual(vec3(3, 0.5, 0.5));
     expect(aabbHit?.remainingMotion).toEqual(vec3(2, 0, 0));
-    expect(aabbHit?.startedOverlapping).toBe(false);
+    expect(aabbHit?.startedInContact).toBe(false);
 
     expect(sphereHit?.time).toBeCloseTo(0.3, 12);
     expect(sphereHit?.point).toEqual(vec3(4, 0, 0));
     expect(sphereHit?.remainingMotion).toEqual(vec3(7, 0, 0));
-    expect(sphereHit?.startedOverlapping).toBe(false);
+    expect(sphereHit?.startedInContact).toBe(false);
 
     expect(overlappingSphereHit?.time).toBe(0);
-    expect(overlappingSphereHit?.startedOverlapping).toBe(true);
+    expect(overlappingSphereHit?.startedInContact).toBe(true);
   });
 });

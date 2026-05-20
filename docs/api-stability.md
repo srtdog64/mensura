@@ -37,7 +37,7 @@ These layers are public enough to dogfood, but not yet stable enough to freeze:
 
 | Subpath | Status | Reason |
 |---|---|---|
-| `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA/MPR/CCD witnesses are in place for common overlap, separation, touching-boundary, iteration-budget, and penetration-recovery cases. `GjkResult` exposes `simplex` and `simplexSize` as a context-owned view; `epa(simplex, simplexSize, ...)` takes the explicit size; `mprIntersect` runs portal discovery/refinement directly for binary convex intersection. Remaining: broader randomized convex support-map coverage and MPR penetration/contact recovery. |
+| `@exornea/mensura/collision` | Experimental | SAT/GJK/EPA/MPR/CCD witnesses are in place for common overlap, separation, touching-boundary, iteration-budget, and penetration-recovery cases. `CollisionContext` owns scratch plus numeric policy, `testObbObbSatTrace` is the explicit diagnostic path, and `GjkResult` exposes `simplex` and `simplexSize` as a context-owned view. Remaining: broader randomized convex support-map coverage and MPR penetration/contact recovery. |
 | `@exornea/mensura/accel` | Experimental | BVH behavior is tested, but builder policy and traversal result contracts may still change. |
 | `@exornea/mensura/world` | Experimental | Useful orchestration layer, but body lifecycle and broadphase ownership are not finalized. |
 | `@exornea/mensura/physics` | Compatibility | Re-export facade for older imports. Do not add new primary APIs here. |

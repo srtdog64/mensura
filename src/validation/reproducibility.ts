@@ -1,8 +1,9 @@
 import type { Result } from "../core/result.js";
+import type { MensuraErrorCode, MensuraErrorStage } from "../core/result.js";
 import { err, ok } from "../core/result.js";
 import type { ValidationOptions } from "./index.js";
 
-const DEFAULT_STAGE = "Validation";
+const DEFAULT_STAGE = "Validation" as const;
 const UINT32_MAX = 0xffffffff;
 const FNV1A_OFFSET = 0x811c9dc5;
 const FNV1A_PRIME = 0x01000193;
@@ -545,7 +546,7 @@ function label(options: ValidationOptions): string {
   return options.label ?? "value";
 }
 
-function stage(options: ValidationOptions): string {
+function stage(options: ValidationOptions): MensuraErrorStage {
   return options.stage ?? DEFAULT_STAGE;
 }
 
@@ -667,7 +668,7 @@ function clampUnit(value: number): number {
 }
 
 function seedError<T>(
-  code: string,
+  code: MensuraErrorCode,
   message: string,
   options: ValidationOptions,
   meta: Record<string, unknown>

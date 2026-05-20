@@ -54,11 +54,35 @@ keeps those differences explicit:
 | `mprIntersect` | Matches `gjk`: exact touching reports `intersect: false`. |
 | `sweptAabbTimeOfImpact` | Existing overlap or touching at `t = 0` returns `null`; it reports first future contact events. |
 | `sweptSphereTimeOfImpact` | Existing overlap reports `time = 0` with a defined center-offset normal. |
-| `sweptAabbHit` / `sweptSphereHit` | Rich wrappers over the TOI functions. They add contact point, remaining motion, and `startedOverlapping` metadata without changing the underlying TOI policy. |
+| `sweptAabbHit` / `sweptSphereHit` | Rich wrappers over the TOI functions. They add contact point, remaining motion, and `startedInContact` metadata without changing the underlying TOI policy. |
 
 This is why SAT and GJK/MPR can intentionally disagree on exact boundary cases.
 SAT is usually useful for inclusive overlap tests; GJK and MPR are strict
 support-mapped positive-overlap queries.
+
+## Numeric Policy And Diagnostics
+
+SAT and GJK tolerances are explicit data on `CollisionContext.policy`:
+
+- `satParallelAxisEpsilonSq` controls when a SAT cross axis is considered
+  near-parallel and skipped.
+- `gjkDegenerateDirectionEpsilonSq` controls when a GJK simplex direction is
+  treated as degenerate.
+
+These thresholds are squared-length values because the hot paths already have
+squared lengths available. The default constants preserve the historical
+`1e-6` guards, but callers that need a stricter debug pass can construct a
+context with their own `CollisionPolicy`.
+
+Collision core does not perform JSON logging. Logging inside the narrowphase
+loop would add side effects and allocation pressure to hot paths. Use explicit
+diagnostic surfaces instead:
+
+- `testObbObbSatTrace(a, b, ctx, sink)` emits `axis-tested` and
+  `parallel-axis-skipped` events while running the same canonical SAT
+  implementation as `testObbObbSat`.
+- `gjk` returns `GJK_MAX_ITERATIONS` with `{ maxIterations, simplexSize }` in
+  `Result.error.meta` when the iteration budget is exhausted.
 
 ## Support-Mapped Shapes
 
@@ -87,9 +111,10 @@ binary Minkowski Portal Refinement path:
    portal face.
 6. Return `MPR_MAX_ITERATIONS` if the iteration budget is exhausted.
 
-`MprResult.portalDirection` is diagnostic. It is the final portal face
-direction or an early-exit ray direction. It is not a contact normal, and it
-does not imply penetration depth.
+`MprResult.portalDirection` is diagnostic. When `portalRefined` is `true`, it
+comes from a non-degenerate refined portal face. When `portalRefined` is
+`false`, it is an early-exit ray/fallback direction or a degenerate portal
+case. Neither form implies penetration depth or a full contact manifold.
 
 Use MPR when you have support-mapped convex shapes plus useful interior points
 and only need a boolean intersection decision. Use GJK + EPA when you need a
@@ -108,7 +133,7 @@ type SweepHit = {
   normal: Vec3;
   point: Vec3;
   remainingMotion: Vec3;
-  startedOverlapping: boolean;
+  startedInContact: boolean;
 };
 ```
 

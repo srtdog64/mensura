@@ -40,12 +40,29 @@ scheduling make single-machine microbenchmarks noisy. The threshold constants
 live next to the benchmark cases in `benchmark-runner.js` with comments
 explaining why each family is gated differently.
 
+## Benchmark Magic Numbers
+
+Numbers in the benchmark harness are treated as measured policy, not folklore:
+
+- `SAMPLES = 7`, `WARMUP = 2`: enough runs to take a useful median after V8
+  tier-up without making `check:release` slow.
+- `CHECK_ROUNDS = 3`: release gates use the median ratio across three full
+  rounds, because one benchmark round can be skewed by OS scheduling.
+- `256` vec entries and `128` matrix entries: power-of-two pools let the hot
+  loops wrap indices with `& 255` / `& 127` instead of measuring `%` division.
+- `BATCH_SIZE = 256`: large enough to amortize JS call overhead, small enough
+  to resemble frame-sized editor/game chunks.
+- Ratio gates such as `0.90x`, `1.20x`, `1.75x`, and `2.0x` are documented in
+  `benchmark-runner.js` beside the relevant gate. They are Node/V8-sensitive
+  release contracts, not universal claims across every runtime.
+
 ## Latest Local Snapshot
 
 Environment:
 
 ```txt
 Node: v22.17.0
+V8: 12.4.254.21-node.26
 Samples: 7 median after 2 warmups
 Date: 2026-05-20
 ```

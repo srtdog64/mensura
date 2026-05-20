@@ -1,7 +1,7 @@
 import type { Float32ConversionLoss } from "../core/float.js";
 import { DEFAULT_FLOAT_TOLERANCE, conversionLossF32 } from "../core/float.js";
 import type { Mat4Like } from "../core/mat4.js";
-import type { MensuraError, Result } from "../core/result.js";
+import type { MensuraError, MensuraErrorCode, MensuraErrorStage, Result } from "../core/result.js";
 import { err, ok } from "../core/result.js";
 import type { Vec3 } from "../core/vec3.js";
 import { lengthSq3 } from "../core/vec3.js";
@@ -17,11 +17,11 @@ import { triangleDoubleArea } from "../measure/triangle.js";
 
 export * from "./reproducibility.js";
 
-const DEFAULT_STAGE = "Validation";
+const DEFAULT_STAGE = "Validation" as const;
 
 export interface ValidationOptions {
   readonly label?: string;
-  readonly stage?: string;
+  readonly stage?: MensuraErrorStage;
 }
 
 export interface F32StabilityOptions extends ValidationOptions {
@@ -430,7 +430,7 @@ function label(options: ValidationOptions): string {
   return options.label ?? "value";
 }
 
-function stage(options: ValidationOptions): string {
+function stage(options: ValidationOptions): MensuraErrorStage {
   return options.stage ?? DEFAULT_STAGE;
 }
 
@@ -442,7 +442,7 @@ function withLabel<T extends ValidationOptions>(options: T, nextLabel: string): 
 }
 
 function validationError<T>(
-  code: string,
+  code: MensuraErrorCode,
   message: string,
   options: ValidationOptions,
   meta: Record<string, unknown>

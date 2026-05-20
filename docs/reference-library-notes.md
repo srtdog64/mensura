@@ -313,8 +313,8 @@ against `conversionLossF32`-aware thresholds, not bare `1e-5` constants.
 **Mensura adaptation**
 
 - `mprIntersect` is binary only. It returns `{ intersect, portalDirection,
-  iterations }` and does not claim penetration depth, contact position, or a
-  contact normal.
+  portalRefined, iterations }` and does not claim penetration depth, contact
+  position, or a contact normal.
 - Iteration failure is `Result.error("MPR_MAX_ITERATIONS")`.
 - Touching follows Mensura's existing GJK boundary policy: exact boundary
   contact is not reported as positive overlap.

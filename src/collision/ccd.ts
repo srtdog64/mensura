@@ -11,7 +11,17 @@ export interface TimeOfImpact {
 export interface SweepHit extends TimeOfImpact {
   readonly point: Vec3;
   readonly remainingMotion: Vec3;
-  readonly startedOverlapping: boolean;
+  /**
+   * Whether the pair was already touching or overlapping at `t = 0`.
+   *
+   * Shape-specific policy:
+   * - sphere/sphere: `true` when the center distance starts inside or exactly
+   *   on the combined radius, so the hit reports `time = 0`.
+   * - AABB/AABB: always `false` because the AABB TOI path rejects initial
+   *   contact and returns `null`; use `aabbIntersectsAabb` when initial
+   *   overlap/touching is a separate host policy.
+   */
+  readonly startedInContact: boolean;
 }
 
 export interface CcdOptions {
@@ -25,8 +35,8 @@ export interface CcdOptions {
  * Returns `null` for any of:
  *
  * - the pair already contacts at `t = 0` (any overlap or touching face);
- *   CCD reports first *future* contact events only — penetration recovery is
- *   the EPA layer's job;
+ *   CCD reports first future contact events only, while penetration recovery
+ *   belongs to the EPA/contact layer;
  * - the slab test finds no entry on `[0, maxTime]`;
  * - parallel motion on an axis that is already separated.
  */
@@ -48,6 +58,8 @@ export function sweptAabbTimeOfImpact(
   }
 
   const maxTime = options.maxTime ?? 1;
+  // Absolute velocity epsilon for the slab denominator. This is intentionally
+  // tiny because world-scale tolerance belongs in the caller-provided option.
   const epsilon = options.epsilon ?? 1e-12;
   let tEnter = 0;
   let tExit = maxTime;
@@ -92,8 +104,8 @@ export function sweptAabbTimeOfImpact(
     }
   }
 
-  // No axis advanced tEnter past 0 — pair is moving apart or all motion is
-  // parallel to axes that never close. Initial overlap was filtered above, so
+  // No axis advanced tEnter past 0: the pair is moving apart, or all motion is
+  // parallel to axes that never close. Initial contact was filtered above, so
   // this only fires for "no future contact event".
   if (hitAxis < 0 || tEnter > maxTime) {
     return null;
@@ -123,19 +135,20 @@ export function sweptAabbHit(
     normal: toi.normal,
     point: sweptAabbContactPoint(moving, velocity, target, toi.time, toi.normal),
     remainingMotion: scaleVector(velocity, maxTime - toi.time),
-    startedOverlapping: false
+    startedInContact: false
   };
 }
 
 /**
- * Swept sphere–sphere time of impact under a constant relative velocity.
+ * Swept sphere/sphere time of impact under a constant relative velocity.
  *
- * Quadratic equation `a t² + b t + c = 0` for `|center + v t|² = (rA + rB)²`.
- * Returns `null` when the spheres are moving apart (`b ≥ 0` with `c > 0`),
- * never meet on `[0, maxTime]`, or either radius is negative. Already
- * overlapping pairs (`c ≤ 0`) report `time = 0` with the centre-to-centre
- * normal — there is a well-defined direction even at t=0 here, unlike the
- * AABB case.
+ * Uses the quadratic equation `a * t^2 + b * t + c = 0` for
+ * `|center + velocity * t|^2 = (radiusA + radiusB)^2`. Returns `null` when
+ * the spheres are moving apart (`b >= 0` with `c > 0`), never meet on
+ * `[0, maxTime]`, or either radius is negative. Already-overlapping or
+ * exactly-touching pairs (`c <= 0`) report `time = 0` with the
+ * center-to-center normal; that direction is well-defined for spheres in a
+ * way it is not for the AABB slab path.
  */
 export function sweptSphereTimeOfImpact(
   moving: Sphere,
@@ -218,7 +231,9 @@ export function sweptSphereHit(
       z: movedCenter.z - toi.normal.z * moving.radius
     },
     remainingMotion: scaleVector(velocity, maxTime - toi.time),
-    startedOverlapping: toi.time === 0 && spheresOverlap(moving, target)
+    // `sweptSphereTimeOfImpact` returns `time = 0` exactly for the `c <= 0`
+    // initial-contact branch, so the TOI carries that signal directly.
+    startedInContact: toi.time === 0
   };
 }
 
@@ -250,7 +265,13 @@ function sweptAabbContactPoint(moving: Aabb, velocity: Vec3, target: Aabb, time:
   };
 }
 
-function contactAxisPoint(normalComponent: number, movingMin: number, movingMax: number, targetMin: number, targetMax: number): number {
+function contactAxisPoint(
+  normalComponent: number,
+  movingMin: number,
+  movingMax: number,
+  targetMin: number,
+  targetMax: number
+): number {
   if (normalComponent < 0) {
     return movingMax;
   }
@@ -270,18 +291,10 @@ function scaleVector(value: Vec3, scalar: number): Vec3 {
   };
 }
 
-function spheresOverlap(a: Sphere, b: Sphere): boolean {
-  const dx = a.center.x - b.center.x;
-  const dy = a.center.y - b.center.y;
-  const dz = a.center.z - b.center.z;
-  const radius = a.radius + b.radius;
-  return dx * dx + dy * dy + dz * dz <= radius * radius;
-}
-
 /**
- * Normal from the centre-offset vector, falling back to the negated velocity
+ * Normal from the center-offset vector, falling back to the negated velocity
  * direction if the offset is degenerate. The fallback sign is documented:
- * "points away from velocity" so the caller can resolve along `-normal · v`.
+ * "points away from velocity" so the caller can resolve along `-normal dot v`.
  */
 function contactNormalFromComponents(ox: number, oy: number, oz: number, fallback: Vec3): Vec3 {
   const lenSq = ox * ox + oy * oy + oz * oz;

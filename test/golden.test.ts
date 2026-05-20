@@ -251,6 +251,7 @@ describe("golden math fixtures", () => {
     expect(coincident).toEqual({
       intersect: true,
       portalDirection: vec3(1, 0, 0),
+      portalRefined: false,
       iterations: 0
     });
 
@@ -262,6 +263,7 @@ describe("golden math fixtures", () => {
     expect(touching).toEqual({
       intersect: false,
       portalDirection: vec3(1, 0, 0),
+      portalRefined: false,
       iterations: 1
     });
   });

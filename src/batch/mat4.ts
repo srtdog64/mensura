@@ -7,6 +7,10 @@ export function mat4TransformAffinePoint3IntoMany(
   out: ArrayLike<MutableVec3>,
   count: number
 ): ArrayLike<MutableVec3> {
+  // Hoist the shared matrix columns once per batch. This is intentionally
+  // verbose: local scalar bindings let V8 keep the matrix lanes out of the
+  // inner point loop and are the measured reason this batch path beats a
+  // scalar `affinePoint3Into` loop.
   const xAxisX = matrix[0];
   const xAxisY = matrix[1];
   const xAxisZ = matrix[2];
@@ -39,6 +43,9 @@ export function mat4TransformPoint3IntoMany(
   out: ArrayLike<MutableVec3>,
   count: number
 ): ArrayLike<MutableVec3> {
+  // Same matrix-hoist pattern as the affine batch, but include the perspective
+  // row and w divide. Do not replace this with a helper call unless the
+  // benchmark still proves V8 can inline it.
   const xAxisX = matrix[0];
   const xAxisY = matrix[1];
   const xAxisZ = matrix[2];
@@ -77,6 +84,8 @@ export function mat4TransformDirection3IntoMany(
   out: ArrayLike<MutableVec3>,
   count: number
 ): ArrayLike<MutableVec3> {
+  // Direction vectors ignore translation and perspective. Keeping this as a
+  // separate kernel avoids branch checks inside the point transform loop.
   const xAxisX = matrix[0];
   const xAxisY = matrix[1];
   const xAxisZ = matrix[2];

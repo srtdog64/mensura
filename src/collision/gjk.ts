@@ -74,7 +74,11 @@ export function gjk(
     code: "GJK_MAX_ITERATIONS",
     message: "GJK algorithm exceeded maximum iterations without resolving",
     stage: "GjkIteration",
-    retryable: false
+    retryable: false,
+    meta: {
+      maxIterations,
+      simplexSize
+    }
   });
 }
 
@@ -98,8 +102,8 @@ function line(simplex: MutableVec3[], d: MutableVec3, ctx: CollisionContext): nu
   if (dot3(ctx.gjkAb, ctx.gjkAo) > 0) {
     cross3Into(ctx.gjkAb, ctx.gjkAo, ctx.gjkCross1);
     cross3Into(ctx.gjkCross1, ctx.gjkAb, ctx.gjkCross2);
-    if (lengthSq3(ctx.gjkCross2) < 1e-6) {
-        return 0; // intersection
+    if (lengthSq3(ctx.gjkCross2) < ctx.policy.gjkDegenerateDirectionEpsilonSq) {
+      return 0; // intersection
     }
     copy3Into(ctx.gjkCross2, d);
     return 2;

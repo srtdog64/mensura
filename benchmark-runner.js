@@ -52,9 +52,18 @@ import {
   unsafeVec3ScaleAndAddF32Many
 } from "./dist/unsafe/f32-kernel.js";
 
+// Seven post-warmup samples keep the median stable enough for local V8
+// tiering noise without making `check:release` painfully slow. Two warmups
+// give TurboFan a chance to tier up the tiny kernels before sampling.
 const SAMPLES = 7;
 const WARMUP = 2;
+// Gate ratios are themselves noisy, so release checks use the median ratio of
+// three full benchmark rounds. This catches real regressions while tolerating
+// short OS scheduling spikes.
 const CHECK_ROUNDS = 3;
+// Iteration counts are intentionally asymmetric: vec3 kernels are tiny and
+// need more calls to rise above timer noise; mat4 kernels do more arithmetic
+// per call and can use fewer iterations.
 const VEC_ITERATIONS = 1_000_000;
 const MAT_ITERATIONS = 250_000;
 const GEOMETRY_ITERATIONS = 500_000;
@@ -62,6 +71,9 @@ const WRITE_ITERATIONS = 500_000;
 
 let sink = 0;
 
+// 256 vec entries and 128 matrices are power-of-two pools. The benchmark uses
+// `index & 255` / `index & 127` so the index wrap does not add `%` division
+// overhead to the inner loop being measured.
 const vecA = Array.from({ length: 256 }, (_, index) =>
   vec3(index * 0.125 + 1, index * 0.25 + 2, index * 0.375 + 3)
 );
@@ -101,8 +113,13 @@ const boxes = Array.from({ length: 128 }, (_, index) =>
   aabb(vec3(index * 0.01 - 1, -1, -1), vec3(index * 0.01 + 1, 1, 1))
 );
 const packed = new Float32Array(64);
+// 256 bytes is enough for the write-offset probes below while staying small
+// enough to remain hot in cache. It is not a layout recommendation.
 const dataView = new DataView(new ArrayBuffer(256));
 
+// Batch size 256 amortizes one JS function call over enough elements to expose
+// the intended `*Many` advantage, but remains small enough to resemble editor
+// and game-frame chunks rather than a synthetic million-element stream.
 const BATCH_SIZE = 256;
 const BATCH_REPEATS = Math.floor(VEC_ITERATIONS / BATCH_SIZE);
 const MAT_BATCH_REPEATS = Math.floor(MAT_ITERATIONS / BATCH_SIZE);
@@ -166,6 +183,8 @@ for (let index = 0; index < BATCH_SIZE; index += 1) {
   packedVecBStride16[index * 4 + 2] = vecB[index].z;
 }
 
+// Matrix batches are 128 because each element is 16 floats; doubling this makes
+// the packed arrays larger without improving signal on current Node/V8.
 const MAT_BATCH_SIZE = 128;
 const MAT_PAIR_REPEATS = Math.floor(MAT_ITERATIONS / MAT_BATCH_SIZE);
 const packedMatA = new Float32Array(MAT_BATCH_SIZE * 16);
@@ -942,6 +961,7 @@ function formatMs(value) {
 console.log("Mensura Benchmark");
 console.log("=================");
 console.log(`Node: ${process.version}`);
+console.log(`V8: ${process.versions.v8}`);
 console.log(`Samples: ${SAMPLES} median after ${WARMUP} warmups`);
 console.log("");
 
@@ -995,6 +1015,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 add",
       reference: "gl-matrix vec3.add",
       referenceGroup: "vec3 add",
+      // 0.90x is a competitiveness floor, not a claim that object-property
+      // stores always beat gl-matrix typed-array stores on every V8 build.
       minRatio: 0.9,
       competitive: true
     },
@@ -1004,6 +1026,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 normalize",
       reference: "gl-matrix vec3.normalize",
       referenceGroup: "vec3 normalize",
+      // Normalize includes a sqrt and can move with V8 math intrinsic tiering;
+      // keep it near gl-matrix while requiring other direct APIs to win too.
       minRatio: 0.9,
       competitive: true
     },
@@ -1013,6 +1037,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "mat4 multiply",
       reference: "gl-matrix mat4.multiply",
       referenceGroup: "mat4 multiply",
+      // Mat4 multiply is arithmetic-heavy, so a small margin below gl-matrix
+      // can be host noise rather than a real architectural failure.
       minRatio: 0.9,
       competitive: true
     },
@@ -1022,6 +1048,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "mat4 transform",
       reference: "gl-matrix vec3.transformMat4",
       referenceGroup: "mat4 transform",
+      // Affine transform should usually win, but the gate remains a
+      // competitive floor because this section also checks direct wins count.
       minRatio: 0.9,
       competitive: true
     },
@@ -1031,6 +1059,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 add batch",
       reference: "gl-matrix loop",
       referenceGroup: "vec3 add batch",
+      // Batch object APIs should clear cross-package call overhead by a visible
+      // margin; 1.20x has held across local Node/V8 runs without being flaky.
       minRatio: 1.2
     },
     {
@@ -1039,6 +1069,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 normalize batch",
       reference: "gl-matrix loop",
       referenceGroup: "vec3 normalize batch",
+      // Sqrt-heavy normalize batches get less headroom than add, but should
+      // still beat the gl-matrix loop after call overhead is amortized.
       minRatio: 1.2
     },
     {
@@ -1047,6 +1079,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "mat4 affine transform batch",
       reference: "scalar object loop (affinePoint3Into)",
       referenceGroup: "mat4 affine transform batch",
+      // Matrix hoisting is the expected win here; 1.15x leaves room for host
+      // variance while blocking regressions that remove the hoist benefit.
       minRatio: 1.15
     },
     {
@@ -1055,6 +1089,9 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 add batch",
       reference: "scalar object loop (add3Into)",
       referenceGroup: "vec3 add batch",
+      // Packed vec3 add is the flagship unsafe kernel: tiny body, contiguous
+      // typed-array lanes. If it is not at least 2x scalar object loop, the
+      // unsafe path is not earning its complexity on that runtime.
       minRatio: 2
     },
     {
@@ -1063,6 +1100,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 dot batch",
       reference: "Mensura dot3IntoMany",
       referenceGroup: "vec3 dot batch",
+      // Dot writes scalar outputs and benefits from packed input reads, but
+      // has less work than cross/scaleAndAdd; use a lower unsafe floor.
       minRatio: 1.25
     },
     {
@@ -1071,6 +1110,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 cross batch",
       reference: "Mensura cross3IntoMany",
       referenceGroup: "vec3 cross batch",
+      // Cross has six mul/sub terms and enough packed-lane reuse to justify a
+      // higher unsafe floor.
       minRatio: 1.75
     },
     {
@@ -1079,6 +1120,8 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "vec3 scaleAndAdd batch",
       reference: "Mensura scaleAndAdd3IntoMany",
       referenceGroup: "vec3 scaleAndAdd batch",
+      // Scale-and-add is an integrator hot path and should show a clear packed
+      // buffer win before being promoted as unsafe guidance.
       minRatio: 1.75
     },
     {
@@ -1087,6 +1130,9 @@ function checkPerformanceGates(initialResults) {
       actualGroup: "mat4 transform batch (perspective)",
       reference: "gl-matrix loop",
       referenceGroup: "mat4 transform batch (perspective)",
+      // Perspective transform batch only needs to beat the gl-matrix loop; the
+      // unsafe variant is deliberately not gated because current V8 can already
+      // inline the object batch well.
       minRatio: 1
     }
   ];

@@ -4,7 +4,7 @@ import { MAT3_IDENTITY, mat3, normalize3, scaleAndAdd3, vec3 } from "../src/core
 import type { Obb } from "../src/geometry/index.js";
 import { aabb, obb, ray } from "../src/geometry/index.js";
 import { AccelContext, buildBvh, bvhRaycast } from "../src/accel/index.js";
-import { epa, gjk, testObbObbSat, CollisionContext } from "../src/collision/index.js";
+import { epa, gjk, testObbObbSat, testObbObbSatTrace, CollisionContext } from "../src/collision/index.js";
 import { CollisionWorld } from "../src/world/index.js";
 import {
   createDeterministicRng,
@@ -168,6 +168,48 @@ describe("Layered collision public surface", () => {
     expect(testObbObbSat(a, far, ctx)).toBe(false);
   });
 
+  it("exposes explicit SAT trace events without default logging", () => {
+    const tiny = rotationYMat3(1e-7);
+    const a = obb(vec3(0, 0, 0), vec3(1, 1, 1), MAT3_IDENTITY);
+    const close = obb(vec3(1.5, 0, 0), vec3(1, 1, 1), tiny);
+    const ctx = new CollisionContext();
+    const events: string[] = [];
+
+    const result = testObbObbSatTrace(a, close, ctx, (event) => {
+      events.push(event.type);
+    });
+
+    expect(result).toBe(true);
+    expect(events).toContain("axis-tested");
+    expect(events).toContain("parallel-axis-skipped");
+  });
+
+  it("uses CollisionContext policy for SAT parallel-axis tolerance", () => {
+    const tiny = rotationYMat3(1e-7);
+    const a = obb(vec3(0, 0, 0), vec3(1, 1, 1), MAT3_IDENTITY);
+    const close = obb(vec3(1.5, 0, 0), vec3(1, 1, 1), tiny);
+    const strictCtx = new CollisionContext({
+      satParallelAxisEpsilonSq: 0,
+      gjkDegenerateDirectionEpsilonSq: 1e-6
+    });
+    const skippedCtx = new CollisionContext({
+      satParallelAxisEpsilonSq: 1,
+      gjkDegenerateDirectionEpsilonSq: 1e-6
+    });
+    const strictEvents: string[] = [];
+    const skippedEvents: string[] = [];
+
+    testObbObbSatTrace(a, close, strictCtx, (event) => {
+      strictEvents.push(event.type);
+    });
+    testObbObbSatTrace(a, close, skippedCtx, (event) => {
+      skippedEvents.push(event.type);
+    });
+
+    expect(strictEvents).not.toContain("parallel-axis-skipped");
+    expect(skippedEvents).toContain("parallel-axis-skipped");
+  });
+
   it("detects simple GJK sphere support intersections", () => {
     const a = sphereSupport(vec3(0, 0, 0), 1);
     const b = sphereSupport(vec3(1, 0, 0), 1);
@@ -253,6 +295,9 @@ describe("Layered collision public surface", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("GJK_MAX_ITERATIONS");
       expect(result.error.stage).toBe("GjkIteration");
+      expect(result.error.meta).toMatchObject({
+        maxIterations: 1
+      });
     }
   });
 

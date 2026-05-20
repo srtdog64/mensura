@@ -25,7 +25,12 @@ export interface IndexedAabbPair {
 /**
  * Raycast a ray against `count` AABBs and append hit records to `out`.
  *
- * The returned hits preserve input order, not distance order. Use
+ * Slot-reuse contract: existing slots in `out` are reused in place. The
+ * function grows `out` only when more hits are found than the array
+ * previously held. Pre-size `out` (with fresh `MutableIndexedRayHit` entries)
+ * to the maximum expected hit count to avoid allocation across frames.
+ *
+ * Hit records preserve input order, not distance order. Use
  * `nearestRayAabbHit` when only the closest hit matters.
  */
 export function raycastManyAabbInto(
@@ -34,18 +39,23 @@ export function raycastManyAabbInto(
   out: MutableIndexedRayHit[],
   count: number = boxes.length
 ): MutableIndexedRayHit[] {
-  out.length = 0;
+  let hitCount = 0;
   for (let i = 0; i < count; i++) {
     const distance = rayAabbHitDistance(value, boxes[i]);
     if (distance === null) {
       continue;
     }
-    out.push({
-      index: i,
-      distance,
-      point: rayAtInto(value, distance, mutableVec3())
-    });
+    let slot = out[hitCount];
+    if (!slot) {
+      slot = { index: 0, distance: 0, point: mutableVec3() };
+      out[hitCount] = slot;
+    }
+    slot.index = i;
+    slot.distance = distance;
+    rayAtInto(value, distance, slot.point);
+    hitCount++;
   }
+  out.length = hitCount;
   return out;
 }
 

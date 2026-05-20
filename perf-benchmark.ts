@@ -13,6 +13,9 @@ import {
 import { aabb, ray } from "./dist/geometry/index.js";
 import { rayAabbHitDistance } from "./dist/query/index.js";
 
+// Focused smoke benchmark for humans. `benchmark-runner.js` owns release
+// gates; this file stays shorter and uses enough operations to rise above
+// timer noise in Node without making ad-hoc runs slow.
 const COUNT = 200_000;
 const WARMUPS = 2;
 const SAMPLES = 7;
@@ -23,9 +26,13 @@ function main(): void {
   console.log("Mensura focused perf benchmark");
   console.log("==============================");
   console.log(`Node: ${process.version}`);
+  console.log(`V8: ${process.versions.v8}`);
   console.log(`Count: ${COUNT}`);
   console.log(`Samples: ${SAMPLES} median after ${WARMUPS} warmups\n`);
 
+  // 128-element pools are powers of two so the hot loops can wrap indices with
+  // `i & 127` instead of `% 128`; the benchmark should measure Mensura math,
+  // not integer division in the harness.
   const vectors = Array.from({ length: 128 }, (_, i) =>
     vec3(i * 0.125 + 1, i * 0.25 + 2, i * 0.375 + 3)
   );
@@ -57,6 +64,8 @@ function main(): void {
     }
   });
 
+  // Mat4 multiply performs substantially more arithmetic than a vec3 op, so
+  // use fewer iterations to keep this focused benchmark interactive.
   bench("mat4 multiplyInto", COUNT / 8, () => {
     const out = matrices[0].slice();
     for (let i = 0; i < COUNT / 8; i++) {
@@ -72,6 +81,8 @@ function main(): void {
     }
   });
 
+  // MPR is an iterative narrowphase; lower count keeps the benchmark useful as
+  // a quick smoke rather than a full collision stress test.
   bench("MPR sphere/sphere", COUNT / 16, () => {
     for (let i = 0; i < COUNT / 16; i++) {
       const result = mprIntersect(
@@ -83,6 +94,8 @@ function main(): void {
     }
   });
 
+  // BVH build allocates and sorts by design. 256 builds gives a visible median
+  // without dominating the focused benchmark.
   bench("BVH build 128 AABBs", 256, () => {
     for (let i = 0; i < 256; i++) {
       const result = buildBvh(boxes, { maxPrimitivesPerLeaf: 4, splitMethod: "sah" });

@@ -434,7 +434,9 @@ The Mensura contract is intentionally narrower than full contact generation:
 - Input is two convex support-mapped shapes, each with a caller-provided
   interior point (`center`) and `support(direction)`.
 - Output is a boolean intersection decision plus diagnostic portal data.
-- `portalDirection` is the final portal face direction, not a contact normal.
+- `portalDirection` is a refined portal-face direction only when
+  `portalRefined` is `true`; early exits and degenerate portal cases report
+  `portalRefined = false`. Neither form is a contact normal/depth pair.
 - Iteration exhaustion is a data failure: `Result.error.code =
   "MPR_MAX_ITERATIONS"`.
 - Penetration depth and contact position remain the responsibility of EPA or a

@@ -59,6 +59,11 @@ function degenerate(detail: string, meta?: Record<string, unknown>): Result<neve
 }
 
 function validateAabbMeasureDomain(box: Aabb, point?: Vec3): Result<true> {
+  // Empty AABBs use ±Infinity as the sentinel, which `validateFiniteAabb`
+  // would reject with `VALIDATION_VEC3_NON_FINITE` before
+  // `validateNonEmptyAabb` ever reached the emptiness check. Catch the empty
+  // case up front and map it to the measure-domain error directly. The
+  // finite-component pass below then sees a real bounded AABB.
   if (aabbIsEmpty(box)) {
     return emptyDomain("AABB measure requires a non-empty AABB", {
       min: box.min,

@@ -81,6 +81,14 @@ loops use `@exornea/mensura/batch` (object arrays) or
 - `unwrap(r, hint?)` — assertion-style; throws on failure. Reserve for
   test / CI fail-fast.
 
+Typed error policy:
+
+- `MensuraError.code` and `MensuraError.stage` are literal unions
+  (`MensuraErrorCode`, `MensuraErrorStage`), not unconstrained raw strings.
+- Prefer `isOk`, `isErr`, `matchResult`, and `unwrapOr` when failures should
+  stay as data. `unwrap` intentionally throws and belongs at tests, examples,
+  CLI, or CI fail-fast boundaries, not inside library hot paths.
+
 > 모든 boundary 실패는 `Result.error`. throw는 boot/init 외 회피.
 
 ### `vec3.ts` — 3D vectors
@@ -288,8 +296,11 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 - capsule pair measurements:
   `capsuleCapsuleClosestPoints(/Into)`, `capsuleCapsuleDistance`,
   `capsuleCapsuleSignedDistance`, `capsuleCapsuleContact(/Into)`.
-  Contact data reports surface points, normal from capsule A toward capsule B,
-  clamped distance, signed distance, and `intersects`.
+  Contact data reports `surfacePoint0` / `surfacePoint1`, normal from capsule
+  A toward capsule B, clamped distance, signed distance, and `intersects`.
+  Segment-axis closest points are available from
+  `capsuleCapsuleClosestPoints`; contact witness data uses only the
+  `surfacePoint0` / `surfacePoint1` names.
 
 ### `frustum.ts`
 
@@ -363,7 +374,9 @@ behaviour see `measure/checked` below.
   `aabbGetBoundingSphere`/`Into`.
 - Capsule: `capsuleGetAabb`/`Into`, `capsuleSegmentDistanceSqToPoint`,
   `capsuleCapsuleClosestPoints(/Into)`, `capsuleCapsuleDistance`,
-  `capsuleCapsuleSignedDistance`, `capsuleCapsuleContact(/Into)`.
+  `capsuleCapsuleSignedDistance`, `capsuleCapsuleContact(/Into)`. Contact
+  witness points are named `surfacePoint0` / `surfacePoint1` to avoid
+  overloading capsule endpoint names.
 - Triangle (`measure/triangle.ts`, own implementation):
   - `triangleNormal`/`Into` — `cross(b - a, c - a)` then normalize.
     Degenerate triangles produce a zero normal.
@@ -588,12 +601,19 @@ one context per concurrent caller (worker, async pipeline).
 
 - `CollisionContext` holds every SAT, GJK, EPA, and MPR scratch slot. Treat it
   as single-owner mutable state: one context per concurrent caller.
+- Constructor policy: `new CollisionContext(policy?)` accepts a
+  `CollisionPolicy` with `satParallelAxisEpsilonSq` and
+  `gjkDegenerateDirectionEpsilonSq`. Defaults preserve the historical
+  near-parallel / degenerate-direction thresholds.
 
 ### `sat.ts`
 
 - `testObbObbSat(a, b, ctx) -> boolean` - Separating Axis Theorem with 15
   axes (3 + 3 + 9 cross products). Boundary policy is inclusive: touching OBB
   boundaries count as overlap.
+- `testObbObbSatTrace(a, b, ctx, sink) -> boolean` - same canonical SAT
+  implementation with explicit diagnostic events. The default SAT path does
+  not log or allocate trace objects.
 
 ### `gjk.ts`
 
@@ -603,7 +623,8 @@ one context per concurrent caller (worker, async pipeline).
   Success carries `{ intersect, simplex, simplexSize }`. `simplex` is a
   view into `ctx.gjkSimplex` and **stays valid only until the next `gjk()`
   call on the same context**. Copy explicitly if you need to keep the points.
-  Exceeding `maxIterations` returns `GJK_MAX_ITERATIONS`.
+  Exceeding `maxIterations` returns `GJK_MAX_ITERATIONS` with
+  `{ maxIterations, simplexSize }` in `error.meta`.
 
 ### `mpr.ts`
 
@@ -612,15 +633,16 @@ one context per concurrent caller (worker, async pipeline).
 - `mprIntersect(a, b, ctx, maxIterations = 64, tolerance = 1e-9) ->
   Result<MprResult>` - runs Minkowski Portal Refinement portal discovery and
   portal refinement directly. Success carries `{ intersect, portalDirection,
-  iterations }`. Exact touching follows the GJK boundary policy and reports
-  `intersect: false`; exhausted iteration budget returns
+  portalRefined, iterations }`. Exact touching follows the GJK boundary policy
+  and reports `intersect: false`; exhausted iteration budget returns
   `MPR_MAX_ITERATIONS`.
 
 `center` must be inside, or at least very near the interior of, the convex
 shape. The support function must return the farthest point on the shape in the
 given direction. `portalDirection` is useful diagnostic data from the final
-portal face or early exit ray; it is not a penetration normal. Use GJK + EPA
-when a contact normal and depth are required.
+portal face or early exit ray; `portalRefined` tells whether that direction
+came from a non-degenerate refined portal face. It is still not a penetration
+normal/depth pair. Use GJK + EPA when contact recovery is required.
 
 ```ts
 import { CollisionContext, mprIntersect } from "@exornea/mensura/collision";

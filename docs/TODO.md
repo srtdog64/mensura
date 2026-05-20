@@ -213,9 +213,10 @@ into a professional-grade math library. These items are not all required for a
 
 ### Numerical Stability
 
-- Document epsilon policy for every algorithm family that needs tolerances:
-  vector normalization, quaternion interpolation, matrix inversion,
-  ray/shape hits, SAT/GJK/EPA/MPR, CCD, and BVH bounds.
+- Document epsilon policy for every algorithm family that needs tolerances.
+  SAT and GJK now expose their hot-loop squared-length thresholds through
+  `CollisionPolicy`; remaining families to tighten include ray/shape hits,
+  EPA/MPR, CCD, and BVH bounds.
 - Keep degenerate cases explicit:
   zero vectors, singular matrices, empty AABBs, degenerate triangles,
   invalid capsules, zero-radius spheres, parallel rays, and coplanar or

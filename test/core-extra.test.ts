@@ -25,6 +25,9 @@ import {
   ok,
   err,
   andThen,
+  isErr,
+  isOk,
+  matchResult,
   mapErr,
   quat,
   quatIdentityInto,
@@ -34,7 +37,8 @@ import {
   quatSlerp,
   scale4,
   vec3,
-  vec4
+  vec4,
+  unwrapOr
 } from "../src/core/index.js";
 
 describe("Core extension primitives", () => {
@@ -82,13 +86,20 @@ describe("Core extension primitives", () => {
 
   it("composes Result helpers without throwing", () => {
     const good = andThen(ok(2), (value) => ok(value * 3));
-    const bad = mapErr(err({ code: "X", message: "x", stage: "test" }), (error) => ({
+    const bad = mapErr(err({ code: "VALIDATION_NON_FINITE", message: "x", stage: "Validation" }), (error) => ({
       ...error,
-      code: "Y"
+      code: "VALIDATION_INVALID_RANGE" as const
     }));
 
     expect(good).toEqual(ok(6));
-    expect(bad).toEqual(err({ code: "Y", message: "x", stage: "test" }));
+    expect(isOk(good)).toBe(true);
+    expect(isErr(bad)).toBe(true);
+    expect(matchResult(good, {
+      ok: (value) => value + 1,
+      err: () => 0
+    })).toBe(7);
+    expect(unwrapOr(bad, 10)).toBe(10);
+    expect(bad).toEqual(err({ code: "VALIDATION_INVALID_RANGE", message: "x", stage: "Validation" }));
   });
 
   it("writes through mutable Vec4 outputs", () => {

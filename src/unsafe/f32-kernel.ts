@@ -1,3 +1,9 @@
+// Unsafe kernels spell out stride constants in the loop bodies on purpose:
+// vec3 = 3 floats, WGSL vec3<f32> = 4-float / 16-byte stride, quat = 4 floats,
+// mat4 = 16 floats. These are data-layout contracts, not arbitrary magic
+// numbers. Keep layout-specific variants separate so callers opt in explicitly
+// and benchmark gates can judge each packed path on the current Node/V8.
+
 export function unsafeVec3AddF32(
   a: Float32Array,
   aOffset: number,

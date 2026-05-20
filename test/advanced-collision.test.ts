@@ -172,6 +172,34 @@ describe("MPR-style support map query and WASM SIMD status", () => {
     if (!result.ok) return;
     expect(result.value.portalDirection).toEqual(vec3(1, 0, 0));
     expect(result.value.intersect).toBe(true);
+    // Coincident centres are the +X fallback — not a refined portal face.
+    expect(result.value.portalRefined).toBe(false);
+  });
+
+  it("flags portalRefined = false for early-exit MPR results", () => {
+    const ctx = new CollisionContext();
+    const result = mprIntersect(
+      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
+      { center: vec3(4, 0, 0), support: sphereSupport(vec3(4, 0, 0), 1) },
+      ctx
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.intersect).toBe(false);
+    expect(result.value.portalRefined).toBe(false);
+  });
+
+  it("flags portalRefined = true after MPR runs portal refinement", () => {
+    const ctx = new CollisionContext();
+    const result = mprIntersect(
+      { center: vec3(0, 0, 0), support: boxSupport(vec3(0, 0, 0), vec3(1, 1, 1)) },
+      { center: vec3(0.5, 0.35, 0.25), support: boxSupport(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
+      ctx
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.intersect).toBe(true);
+    expect(result.value.portalRefined).toBe(true);
   });
 
   it("refines a non-collinear box portal without falling back to GJK", () => {

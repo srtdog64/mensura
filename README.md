@@ -122,8 +122,8 @@ the public package.
   `intersect: false` because the support advance is not strictly positive.
 - `mprIntersect` runs Minkowski Portal Refinement directly for binary convex
   intersection. It requires `{ center, support }` per shape, returns
-  `{ intersect, portalDirection, iterations }`, and uses the same strict
-  boundary policy as `gjk`.
+  `{ intersect, portalDirection, portalRefined, iterations }`, and uses the
+  same strict boundary policy as `gjk`.
 - `epa` is the penetration-depth recovery path after a real GJK 4-simplex.
 - CCD helpers report first future contact events, with documented initial
   overlap behavior per shape family.
@@ -145,8 +145,10 @@ Common error codes: `VALIDATION_INVALID_FORMAT` (bad perspective arguments),
 stable axis), `GJK_MAX_ITERATIONS`, `EPA_MAX_ITERATIONS`, and
 `MPR_MAX_ITERATIONS` for collision iteration budgets.
 
-Use `unwrap(result)` for call sites that should fail fast, or `result.ok`
-discrimination for callers that need to handle the error.
+`MensuraError.code` and `MensuraError.stage` are typed literal unions, not raw
+strings. Use `result.ok`, `isOk`, `isErr`, `matchResult`, or `unwrapOr` when
+failures should remain data. Use `unwrap(result)` only at fail-fast boundaries
+such as tests, examples, CLI, or CI.
 
 ## Policy
 
