@@ -37,7 +37,12 @@ assumption.
 ```ts
 import { CollisionWorld } from "@exornea/mensura/world";
 import { AccelContext } from "@exornea/mensura/accel";
-import { CollisionContext, gjk, mprIntersect, testObbObbSat } from "@exornea/mensura/collision";
+import {
+  CollisionContext,
+  gjk,
+  mprIntersect,
+  testObbObbSat
+} from "@exornea/mensura/collision";
 
 // One CollisionWorld per worker; its private accel context is not shared.
 const world = new CollisionWorld();
@@ -51,8 +56,8 @@ function step(): void {
   // world.raycast uses its own private context, so it is independent of `accel`.
   const hits = world.raycast(viewRay);
   const overlap = testObbObbSat(boxA, boxB, collision);
-  const probe = gjk(supportA, supportB, collision);
-  const portalProbe = mprIntersect(shapeA, shapeB, collision);
+  const probe = gjk(supportAInto, supportBInto, collision);
+  const portalProbe = mprIntersect(shapeAInto, shapeBInto, collision);
 }
 ```
 

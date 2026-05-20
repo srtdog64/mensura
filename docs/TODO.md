@@ -1,6 +1,6 @@
 # Mensura TODO
 
-This file tracks remaining work after the v0.1 kernel pass. It should reflect
+This file tracks remaining work after the v0.3 kernel pass. It should reflect
 the current package shape, not the historical reference-reading checklist.
 
 ## Current Baseline
@@ -29,7 +29,8 @@ Already in place:
   `gaussian` / `triangular` distributions, `sampleDeterministicInt`,
   `shuffleInPlace`, `sampleUnitDirection3Into` / `sampleInUnitBall3Into` /
   `sampleInAabbInto`, `forkRng` named sub-streams, and bias diagnostics
-  (`summarizeSamples`, `validateUniformBias`).
+  (`summarizeSamples`, `validateUniformBias`). Observation suitability gates
+  sit here before measurement/analyzer/anchor/compare code paths.
 - `batch`: object-array `*IntoMany` kernels.
 - `gpu`: WebGPU projection and Float32Array bridge.
 - `unsafe`: explicit packed Float32Array and DataView helpers.
@@ -43,15 +44,15 @@ Already in place:
   `.mensura-visual/` through `examples/visual-ray-fixtures.mjs`.
   `test/visual-ray-fixtures.test.ts` keeps the visual manifest values tied to
   the actual ray API calculations.
-- Release hardening has started: golden fixtures, deterministic fuzz
-  invariants, experimental-module build output (`dist-experimental/`, ignored),
-  package export plus `dist/*.d.ts` symbol snapshot, packaged
+- Release hardening has started: golden fixtures, deterministic invariant
+  replay tests, experimental-module build output (`dist-experimental/`,
+  ignored), package export plus `dist/*.d.ts` symbol snapshot, packaged
   bundler-resolution smoke checks, Vite browser bundle smoke checks, and a
-  longer deterministic fuzz corpus.
+  longer deterministic edge-case corpus.
 
 ## P0: API Freeze Prep
 
-- Maintain `docs/api-stability.md` as the source of truth for stable 0.1,
+- Maintain `docs/api-stability.md` as the source of truth for stable 0.3,
   experimental, compatibility, and unsafe surfaces.
 - Treat `test/golden/api-surface.json` as an intentional-change gate. It pins
   package exports and generated `.d.ts` symbols, so public API drift should be
@@ -85,11 +86,15 @@ Collision is the least mature public area. Before calling it public-ready:
 - Release guard: public source is checked by `release:stub-check`, so
   placeholder collision exports cannot pass `npm run check:release` or
   `prepublishOnly`.
+- GJK/MPR/EPA now accept only `SupportFunctionInto`, so support points write
+  into `CollisionContext` scratch instead of allocating a fresh `Vec3` per
+  support query. Allocating support-map adapters belong outside Mensura's
+  collision core.
 - GJK hot path no longer allocates per call: `CollisionContext` now owns the
-  simplex pool, the initial direction, and the working direction. `GjkResult`
-  exposes `simplex` and `simplexSize` as a view into the context (valid until
-  the next `gjk` call). `epa(simplex, simplexSize, ...)` takes the explicit
-  size so it never slices.
+  simplex pool, the initial direction, working direction, and support-map
+  scratch. `GjkResult` exposes `simplex` and `simplexSize` as a view into the
+  context (valid until the next GJK call). `epa(simplex, simplexSize, ...)`
+  takes the explicit size so it never slices.
 - Deterministic non-converging EPA witness lands by calling `epa` with
   `maxIterations = 0` against a real GJK 4-simplex, so the loop never enters
   and the function falls through to `EPA_MAX_ITERATIONS`.
@@ -190,7 +195,7 @@ Filled the previously empty cells in the shape-pair matrix:
 
 This is the long-term bar for turning Mensura from a compact spatial kernel
 into a professional-grade math library. These items are not all required for a
-0.1.x release, but they define what "world-class" would mean in this repo.
+0.3.x release, but they define what "world-class" would mean in this repo.
 
 ### API Breadth
 
@@ -239,8 +244,17 @@ into a professional-grade math library. These items are not all required for a
   matrix projection, look-at, compose/decompose, quaternion interpolation,
   ray/shape hits, frustum extraction, BVH traversal, CCD, and collision
   contact data.
-- Grow the deterministic fuzz corpus over time instead of replacing it.
+- Grow the deterministic edge-case corpus over time instead of replacing it.
   Failures should become named fixtures before the seed disappears.
+- Keep fuzzer engines completely outside Mensura. Mensura may expose
+  deterministic seeds, domain invariants, corpus files, and replay tests, but
+  it must not import or depend on a project-specific fuzzer implementation
+  from `F:\tex_bug` or any other workspace.
+- Treat fuzz integration as an adapter boundary:
+  - external fuzzer owns generation, shrinking, scheduling, and reporting;
+  - Mensura owns only pure invariant functions and replayable fixtures;
+  - no fuzzer runtime dependency belongs in package exports, release builds,
+    or published tarballs.
 - Add differential tests against reference implementations where the contract
   matches: gl-matrix for low-level vector/matrix kernels, wgpu-matrix for
   WebGPU projection policy, and three.js math for selected geometry queries.
@@ -271,6 +285,9 @@ into a professional-grade math library. These items are not all required for a
 
 - Promote collision from experimental only after contact data and failure
   contracts are covered by tests, fuzz, and docs.
+- Keep support-mapped collision ownership explicit. New support-map APIs should
+  prefer `SupportFunctionInto`; returning `Vec3` from a support function is a
+  convenience path, not the canonical hot loop.
 - Add stronger CCD coverage:
   swept sphere/sphere, swept sphere/AABB, swept capsule, conservative
   advancement where appropriate, initial-overlap policy, and grazing-contact

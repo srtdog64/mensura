@@ -67,18 +67,11 @@ export function normalize3IntoMany(
     const y = v.y;
     const z = v.z;
     const lenSq = x * x + y * y + z * z;
+    const invLen = lenSq > 0 ? 1 / Math.sqrt(lenSq) : 0;
     const vo = out[i];
-
-    if (lenSq > 0) {
-      const invLen = 1 / Math.sqrt(lenSq);
-      vo.x = x * invLen;
-      vo.y = y * invLen;
-      vo.z = z * invLen;
-    } else {
-      vo.x = 0;
-      vo.y = 0;
-      vo.z = 0;
-    }
+    vo.x = x * invLen;
+    vo.y = y * invLen;
+    vo.z = z * invLen;
   }
   return out;
 }

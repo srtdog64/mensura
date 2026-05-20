@@ -302,8 +302,36 @@ export function unsafeVec3CrossF32Many(
   count: number
 ): void {
   const end = count * 3;
+  // Two vec3 lanes are six floats. Cross is a tiny six-mul kernel, so this
+  // small unroll reduces loop-control overhead without changing the stride-3
+  // packed-memory contract.
+  const pairEnd = end - 3;
+  let offset = 0;
 
-  for (let offset = 0; offset < end; offset += 3) {
+  for (; offset < pairEnd; offset += 6) {
+    const ax = a[offset + 0];
+    const ay = a[offset + 1];
+    const az = a[offset + 2];
+    const bx = b[offset + 0];
+    const by = b[offset + 1];
+    const bz = b[offset + 2];
+    out[offset + 0] = ay * bz - az * by;
+    out[offset + 1] = az * bx - ax * bz;
+    out[offset + 2] = ax * by - ay * bx;
+
+    const next = offset + 3;
+    const ax1 = a[next + 0];
+    const ay1 = a[next + 1];
+    const az1 = a[next + 2];
+    const bx1 = b[next + 0];
+    const by1 = b[next + 1];
+    const bz1 = b[next + 2];
+    out[next + 0] = ay1 * bz1 - az1 * by1;
+    out[next + 1] = az1 * bx1 - ax1 * bz1;
+    out[next + 2] = ax1 * by1 - ay1 * bx1;
+  }
+
+  if (offset < end) {
     const ax = a[offset + 0];
     const ay = a[offset + 1];
     const az = a[offset + 2];

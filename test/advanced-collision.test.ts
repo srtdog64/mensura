@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { normalize3, scaleAndAdd3, vec3 } from "../src/core/index.js";
+import type { MutableVec3, Vec3 } from "../src/core/index.js";
+import { lengthSq3, vec3 } from "../src/core/index.js";
 import { aabb, sphere } from "../src/geometry/index.js";
 import type { BroadphasePair } from "../src/accel/index.js";
 import {
@@ -19,19 +20,30 @@ import { ray } from "../src/geometry/index.js";
 import { CollisionWorld } from "../src/world/index.js";
 import { detectWasmSimd } from "../src/wasm/index.js";
 
-function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
-  return (direction: ReturnType<typeof vec3>) => {
-    const normalized = normalize3(direction);
-    return scaleAndAdd3(center, normalized, radius);
+function sphereSupportInto(center: ReturnType<typeof vec3>, radius: number) {
+  return (direction: Vec3, out: MutableVec3) => {
+    const lenSq = lengthSq3(direction);
+    if (lenSq === 0) {
+      out.x = center.x + radius;
+      out.y = center.y;
+      out.z = center.z;
+      return out;
+    }
+    const scale = radius / Math.sqrt(lenSq);
+    out.x = center.x + direction.x * scale;
+    out.y = center.y + direction.y * scale;
+    out.z = center.z + direction.z * scale;
+    return out;
   };
 }
 
-function boxSupport(center: ReturnType<typeof vec3>, extents: ReturnType<typeof vec3>) {
-  return (direction: ReturnType<typeof vec3>) => vec3(
-    center.x + (direction.x >= 0 ? extents.x : -extents.x),
-    center.y + (direction.y >= 0 ? extents.y : -extents.y),
-    center.z + (direction.z >= 0 ? extents.z : -extents.z)
-  );
+function boxSupportInto(center: ReturnType<typeof vec3>, extents: ReturnType<typeof vec3>) {
+  return (direction: Vec3, out: MutableVec3) => {
+    out.x = center.x + (direction.x >= 0 ? extents.x : -extents.x);
+    out.y = center.y + (direction.y >= 0 ? extents.y : -extents.y);
+    out.z = center.z + (direction.z >= 0 ? extents.z : -extents.z);
+    return out;
+  };
 }
 
 describe("SAH BVH and broadphase pairs", () => {
@@ -132,13 +144,13 @@ describe("MPR-style support map query and WASM SIMD status", () => {
   it("classifies convex support-map pairs through the MPR entry point", () => {
     const ctx = new CollisionContext();
     const hit = mprIntersect(
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
-      { center: vec3(1, 0, 0), support: sphereSupport(vec3(1, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
+      { center: vec3(1, 0, 0), supportInto: sphereSupportInto(vec3(1, 0, 0), 1) },
       ctx
     );
     const miss = mprIntersect(
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
-      { center: vec3(4, 0, 0), support: sphereSupport(vec3(4, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
+      { center: vec3(4, 0, 0), supportInto: sphereSupportInto(vec3(4, 0, 0), 1) },
       ctx
     );
 
@@ -151,8 +163,8 @@ describe("MPR-style support map query and WASM SIMD status", () => {
   it("classifies exact support-map touching as non-intersecting", () => {
     const ctx = new CollisionContext();
     const result = mprIntersect(
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
-      { center: vec3(2, 0, 0), support: sphereSupport(vec3(2, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
+      { center: vec3(2, 0, 0), supportInto: sphereSupportInto(vec3(2, 0, 0), 1) },
       ctx
     );
     expect(result.ok).toBe(true);
@@ -164,8 +176,8 @@ describe("MPR-style support map query and WASM SIMD status", () => {
   it("handles coincident interior points as an immediate MPR hit", () => {
     const ctx = new CollisionContext();
     const result = mprIntersect(
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
       ctx
     );
     expect(result.ok).toBe(true);
@@ -179,8 +191,8 @@ describe("MPR-style support map query and WASM SIMD status", () => {
   it("flags portalRefined = false for early-exit MPR results", () => {
     const ctx = new CollisionContext();
     const result = mprIntersect(
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
-      { center: vec3(4, 0, 0), support: sphereSupport(vec3(4, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
+      { center: vec3(4, 0, 0), supportInto: sphereSupportInto(vec3(4, 0, 0), 1) },
       ctx
     );
     expect(result.ok).toBe(true);
@@ -192,8 +204,8 @@ describe("MPR-style support map query and WASM SIMD status", () => {
   it("flags portalRefined = true after MPR runs portal refinement", () => {
     const ctx = new CollisionContext();
     const result = mprIntersect(
-      { center: vec3(0, 0, 0), support: boxSupport(vec3(0, 0, 0), vec3(1, 1, 1)) },
-      { center: vec3(0.5, 0.35, 0.25), support: boxSupport(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
+      { center: vec3(0, 0, 0), supportInto: boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1)) },
+      { center: vec3(0.5, 0.35, 0.25), supportInto: boxSupportInto(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
       ctx
     );
     expect(result.ok).toBe(true);
@@ -205,8 +217,8 @@ describe("MPR-style support map query and WASM SIMD status", () => {
   it("refines a non-collinear box portal without falling back to GJK", () => {
     const ctx = new CollisionContext();
     const result = mprIntersect(
-      { center: vec3(0, 0, 0), support: boxSupport(vec3(0, 0, 0), vec3(1, 1, 1)) },
-      { center: vec3(0.5, 0.35, 0.25), support: boxSupport(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
+      { center: vec3(0, 0, 0), supportInto: boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1)) },
+      { center: vec3(0.5, 0.35, 0.25), supportInto: boxSupportInto(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
       ctx
     );
 
@@ -219,8 +231,8 @@ describe("MPR-style support map query and WASM SIMD status", () => {
   it("returns Result.error when MPR cannot iterate", () => {
     const ctx = new CollisionContext();
     const result = mprIntersect(
-      { center: vec3(0, 0, 0), support: boxSupport(vec3(0, 0, 0), vec3(1, 1, 1)) },
-      { center: vec3(0.5, 0.35, 0.25), support: boxSupport(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
+      { center: vec3(0, 0, 0), supportInto: boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1)) },
+      { center: vec3(0.5, 0.35, 0.25), supportInto: boxSupportInto(vec3(0.5, 0.35, 0.25), vec3(1, 1, 1)) },
       ctx,
       0
     );

@@ -50,6 +50,11 @@ export class CollisionContext {
   public gjkD: MutableVec3 = mutableVec3();
   public gjkSimplex: MutableVec3[] = [mutableVec3(), mutableVec3(), mutableVec3(), mutableVec3()];
 
+  // Support-map scratch shared by GJK, EPA, and MPR. SupportFunctionInto
+  // callers write into these slots so support queries do not allocate.
+  public supportA: MutableVec3 = mutableVec3();
+  public supportB: MutableVec3 = mutableVec3();
+
   // EPA scratchpad
   public epaNorm: MutableVec3 = mutableVec3();
   public epaEdge: MutableVec3 = mutableVec3();

@@ -3,7 +3,7 @@ import { copy3Into, cross3Into, dot3, lengthSq3, scale3Into, sub3Into } from "..
 import type { Result } from "../core/result.js";
 import { err, ok } from "../core/result.js";
 import type { CollisionContext } from "./context.js";
-import type { SupportFunction } from "./gjk.js";
+import type { SupportFunctionInto } from "./gjk.js";
 
 const DEFAULT_MPR_TOLERANCE = 1e-9;
 
@@ -13,7 +13,7 @@ export interface MprShape {
    * shapes this is the geometric center.
    */
   readonly center: Vec3;
-  readonly support: SupportFunction;
+  readonly supportInto: SupportFunctionInto;
 }
 
 export interface MprResult {
@@ -247,11 +247,11 @@ function supportMinkowskiInto(
   ctx.mprNegDir.x = -direction.x;
   ctx.mprNegDir.y = -direction.y;
   ctx.mprNegDir.z = -direction.z;
-  const pa = a.support(direction);
-  const pb = b.support(ctx.mprNegDir);
-  out.x = pa.x - pb.x;
-  out.y = pa.y - pb.y;
-  out.z = pa.z - pb.z;
+  a.supportInto(direction, ctx.supportA);
+  b.supportInto(ctx.mprNegDir, ctx.supportB);
+  out.x = ctx.supportA.x - ctx.supportB.x;
+  out.y = ctx.supportA.y - ctx.supportB.y;
+  out.z = ctx.supportA.z - ctx.supportB.z;
   return out;
 }
 
@@ -354,4 +354,4 @@ function swapInto(a: MutableVec3, b: MutableVec3, temp: MutableVec3): void {
   copy3Into(temp, b);
 }
 
-export type { SupportFunction };
+export type { SupportFunctionInto };

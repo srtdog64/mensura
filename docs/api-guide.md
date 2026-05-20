@@ -495,6 +495,11 @@ Error codes (stage defaults to `"Validation"`):
 | `VALIDATION_INVALID_RANGE` | Integer / bias-bin range is non-integer or inverted. |
 | `VALIDATION_BIAS_OUT_OF_BUDGET` | Sample histogram deviates from uniform beyond the configured tolerance. |
 | `VALIDATION_BIAS_SAMPLE_OUT_OF_RANGE` | A sample fell outside the declared bias-diagnostic range. |
+| `VALIDATION_OBSERVATION_EMPTY` | Observation set has no values. |
+| `VALIDATION_OBSERVATION_INSUFFICIENT` | Observation set has fewer than the required samples. |
+| `VALIDATION_OBSERVATION_MISSING_SEED` | Gate requires reproducibility metadata but no seed was provided. |
+| `VALIDATION_OBSERVATION_MISSING_ANCHOR` | Gate requires comparison metadata but no anchor was provided. |
+| `VALIDATION_OBSERVATION_UNSTABLE` | Observation variance or relative standard deviation is outside the gate budget. |
 
 Functions:
 
@@ -576,6 +581,28 @@ Functions:
       it is a "obviously biased" check for stress harnesses, not a formal
       statistical test.
 
+  - **Observation suitability / measurement pipeline**:
+    - `ObservationSet = { values, label?, seed?, unit?, meta? }`.
+    - `checkObservationSetSuitability(set, options?) ??
+      Result<ObservationSuitability>` ??gate before measurement. Options include
+      `minCount`, `requireSeed`, `requireAnchor`, `anchor`, `minVariance`, and
+      `maxRelativeStddev`.
+    - `measureObservationSet(set, options?) ??Result<Measurement>` ??runs the
+      suitability gate, then reports `min`, `max`, `mean`, `median`, `p75`,
+      `p95`, variance, standard deviation, and relative standard deviation.
+    - `analyzeMeasurement(measurement, { maxRelativeStddev? })` ??simple stable
+      / unstable analyzer over measured variance.
+    - `anchorMeasurement(measurement, label?, version?)` ??captures a baseline
+      for later comparisons.
+    - `compareMeasurementToAnchor(subject, anchor, options?) ??
+      Result<MeasurementComparison>` ??ratio/delta comparison with optional
+      `maxRegressionRatio`.
+
+  The observation gate is not a math hot path and is intentionally not wired
+  into `core`, `query`, `measure`, or `collision`. Use it in tests, benchmark
+  harnesses, fuzz harnesses, imported asset validation, and Geukbit dogfood
+  checks before an analyzer treats noisy or incomplete data as meaningful.
+
   Reproducibility is for stress tests, fixtures, generated benchmark
   inputs, and asset validation replay. It is not a security or
   gameplay-randomness primitive. See
@@ -617,8 +644,8 @@ one context per concurrent caller (worker, async pipeline).
 
 ### `gjk.ts`
 
-- `SupportFunction = (dir: Vec3) => Vec3` - caller supplies one per convex
-  shape.
+- `SupportFunctionInto = (dir: Vec3, out: MutableVec3) => MutableVec3` -
+  canonical support map. The caller writes into the provided output.
 - `gjk(supportA, supportB, ctx, maxIterations = 64) -> Result<GjkResult>`.
   Success carries `{ intersect, simplex, simplexSize }`. `simplex` is a
   view into `ctx.gjkSimplex` and **stays valid only until the next `gjk()`
@@ -628,30 +655,37 @@ one context per concurrent caller (worker, async pipeline).
 
 ### `mpr.ts`
 
-- `MprShape = { center, support }` - support-mapped convex shape plus an
-  interior point used to seed the Minkowski portal.
+- `MprShape = { center, supportInto }` - convex shape using
+  `SupportFunctionInto`.
 - `mprIntersect(a, b, ctx, maxIterations = 64, tolerance = 1e-9) ->
-  Result<MprResult>` - runs Minkowski Portal Refinement portal discovery and
-  portal refinement directly. Success carries `{ intersect, portalDirection,
-  portalRefined, iterations }`. Exact touching follows the GJK boundary policy
-  and reports `intersect: false`; exhausted iteration budget returns
-  `MPR_MAX_ITERATIONS`.
+  Result<MprResult>` - runs Minkowski Portal Refinement portal
+  discovery and portal refinement directly. Success carries
+  `{ intersect, portalDirection, portalRefined, iterations }`. Exact touching
+  follows the GJK boundary policy and reports `intersect: false`; exhausted
+  iteration budget returns `MPR_MAX_ITERATIONS`.
 
 `center` must be inside, or at least very near the interior of, the convex
-shape. The support function must return the farthest point on the shape in the
-given direction. `portalDirection` is useful diagnostic data from the final
-portal face or early exit ray; `portalRefined` tells whether that direction
+shape. The support function must write the farthest point on the shape in the
+given direction into `out` and return `out`. `portalDirection` is useful
+diagnostic data from the final portal face or early exit ray; `portalRefined`
+tells whether that direction
 came from a non-degenerate refined portal face. It is still not a penetration
 normal/depth pair. Use GJK + EPA when contact recovery is required.
 
 ```ts
 import { CollisionContext, mprIntersect } from "@exornea/mensura/collision";
-import { normalize3, scaleAndAdd3, vec3 } from "@exornea/mensura/core";
+import type { MutableVec3, Vec3 } from "@exornea/mensura/core";
+import { normalize3Into, vec3 } from "@exornea/mensura/core";
 
-const sphere = (center: ReturnType<typeof vec3>, radius: number) => ({
+const sphere = (center: Vec3, radius: number) => ({
   center,
-  support: (direction: ReturnType<typeof vec3>) =>
-    scaleAndAdd3(center, normalize3(direction), radius)
+  supportInto: (direction: Vec3, out: MutableVec3) => {
+    normalize3Into(direction, out);
+    out.x = center.x + out.x * radius;
+    out.y = center.y + out.y * radius;
+    out.z = center.z + out.z * radius;
+    return out;
+  }
 });
 
 const ctx = new CollisionContext();
@@ -674,9 +708,11 @@ if (result.ok && result.value.intersect) {
   `EPA_DEGENERATE_SIMPLEX`. Iteration limit exhausted returns
   `EPA_MAX_ITERATIONS`.
 
-For boolean convex overlap, use `testObbObbSat`, `gjk(...).value.intersect`,
-or `mprIntersect(...).value.intersect` depending on shape representation. For
-penetration normal/depth, use a real GJK 4-simplex and pass it to `epa`.
+For boolean convex overlap, use `testObbObbSat`,
+`gjk(...).value.intersect`, or
+`mprIntersect(...).value.intersect` depending on shape
+representation. For penetration normal/depth, use a real GJK 4-simplex and
+pass it to `epa`.
 
 ---
 

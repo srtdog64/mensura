@@ -1,10 +1,12 @@
 # Mensura
 
-Mensura is a small spatial math and geometry kernel for TypeScript game and
-editor runtimes.
+Mensura is a small Geukbit-grade spatial math and geometry kernel for
+TypeScript game and editor runtimes.
 
-It is intentionally lower-level than Geukbit. Mensura should not know about
-scenes, entities, components, assets, inspectors, materials, or renderers.
+It is intentionally lower-level than Geukbit: Mensura owns the reusable
+geometry math that a Geukbit viewport, editor, or runtime can dogfood, but it
+should not know about scenes, entities, components, assets, inspectors,
+materials, or renderers.
 
 ## Scope
 
@@ -72,7 +74,7 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 @exornea/mensura/wasm      WebAssembly feature probes for optional kernels
 ```
 
-For `0.1.x`, `core`, `geometry`, `query`, `measure`, `validation`, `gpu`,
+For `0.3.x`, `core`, `geometry`, `query`, `measure`, `validation`, `gpu`,
 `layout`, `data`, and `batch` are the stable release surface. `collision`,
 `accel`, and `world` are experimental dogfood layers. `physics` is a
 compatibility facade. `wasm` is an experimental feature-probe layer. `unsafe`
@@ -80,6 +82,8 @@ is explicitly unsafe and opt-in.
 
 See [API Stability](docs/api-stability.md) for the release contract.
 See [API Guide](docs/api-guide.md) for layer-by-layer usage notes.
+See [Migration To 0.3.0](docs/migration-0.3.0.md) for the collision
+support-map API change and package-consumption notes.
 See [Collision Layer](docs/collision.md) for SAT/GJK/EPA/MPR/CCD boundary
 semantics.
 See [Math Theory](docs/math-theory.md) for the formulas behind float32 loss,
@@ -94,9 +98,9 @@ triangle normals, areas, barycentric coordinates, and triangle closest points.
 It also exposes `*Checked` variants for boundary callers that want invalid
 measure domains surfaced as `Result` errors.
 `validation` owns `Result`-first precondition checks for finite values,
-non-empty bounds, non-degenerate triangles, stable float32 conversion loss, and
+non-empty bounds, non-degenerate triangles, stable float32 conversion loss,
 deterministic seed/RNG/distribution helpers for reproducible stress or benchmark
-inputs.
+inputs, and observation suitability gates before measurement/comparison.
 `layout` describes byte-level records; `data` is the checked `Result`-first
 bridge from semantic values into those records. `batch` keeps the inspectable
 object policy while amortizing call overhead across many values.
@@ -105,7 +109,9 @@ object policy while amortizing call overhead across many values.
 > a value (point, vector, distance, area), import from `measure`. Shape values
 > themselves (constructors, mutable variants, copies) stay in `geometry`. If
 > the question is whether a value is safe enough to measure or serialize, use
-> `validation`.
+> `validation`. If the question is whether a sample set is suitable enough to
+> compare or analyze, use `validation`'s observation gate before computing the
+> measurement.
 
 `unsafe` is intentionally not re-exported by the root facade. Import it by name
 when a caller owns the buffer layout, bounds checks, and aliasing contract.
@@ -118,12 +124,13 @@ implement their algorithm, return a documented `Result` failure, or stay out of
 the public package.
 
 - `testObbObbSat` is inclusive for touching OBB boundaries.
-- `gjk` is a strict support-mapped intersection query. Exact touching reports
-  `intersect: false` because the support advance is not strictly positive.
+- `gjk` is the caller-owned-output support-map path for GJK. Exact touching
+  reports `intersect: false` because the support advance is not strictly
+  positive.
 - `mprIntersect` runs Minkowski Portal Refinement directly for binary convex
-  intersection. It requires `{ center, support }` per shape, returns
-  `{ intersect, portalDirection, portalRefined, iterations }`, and uses the
-  same strict boundary policy as `gjk`.
+  intersection over `{ center, supportInto }` shapes. It returns
+  `{ intersect, portalDirection, portalRefined, iterations }` and uses the same
+  strict boundary policy as GJK.
 - `epa` is the penetration-depth recovery path after a real GJK 4-simplex.
 - CCD helpers report first future contact events, with documented initial
   overlap behavior per shape family.

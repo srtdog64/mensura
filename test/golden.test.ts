@@ -24,8 +24,7 @@ import {
   quat,
   quatFromUnitVectors,
   quatSlerp,
-  scaleAndAdd3,
-  normalize3,
+  lengthSq3,
   unwrap,
   vec3
 } from "../src/core/index.js";
@@ -59,10 +58,20 @@ function expectVec3Close(actual: { readonly x: number; readonly y: number; reado
   expect(actual.z).toBeCloseTo(expected.z, precision);
 }
 
-function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
-  return (direction: ReturnType<typeof vec3>) => {
-    const normalized = normalize3(direction);
-    return scaleAndAdd3(center, normalized, radius);
+function sphereSupportInto(center: ReturnType<typeof vec3>, radius: number) {
+  return (direction: { readonly x: number; readonly y: number; readonly z: number }, out: { x: number; y: number; z: number }) => {
+    const lenSq = lengthSq3(direction);
+    if (lenSq === 0) {
+      out.x = center.x + radius;
+      out.y = center.y;
+      out.z = center.z;
+      return out;
+    }
+    const scale = radius / Math.sqrt(lenSq);
+    out.x = center.x + direction.x * scale;
+    out.y = center.y + direction.y * scale;
+    out.z = center.z + direction.z * scale;
+    return out;
   };
 }
 
@@ -244,8 +253,8 @@ describe("golden math fixtures", () => {
   it("keeps MPR binary intersection boundary fixtures stable", () => {
     const ctx = new CollisionContext();
     const coincident = unwrap(mprIntersect(
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
       ctx
     ));
     expect(coincident).toEqual({
@@ -256,8 +265,8 @@ describe("golden math fixtures", () => {
     });
 
     const touching = unwrap(mprIntersect(
-      { center: vec3(0, 0, 0), support: sphereSupport(vec3(0, 0, 0), 1) },
-      { center: vec3(2, 0, 0), support: sphereSupport(vec3(2, 0, 0), 1) },
+      { center: vec3(0, 0, 0), supportInto: sphereSupportInto(vec3(0, 0, 0), 1) },
+      { center: vec3(2, 0, 0), supportInto: sphereSupportInto(vec3(2, 0, 0), 1) },
       ctx
     ));
     expect(touching).toEqual({

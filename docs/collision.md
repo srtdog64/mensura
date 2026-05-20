@@ -19,7 +19,7 @@ Complex collision algorithms have one canonical implementation. For GJK and
 MPR that implementation is the support-mapped path:
 
 ```txt
-shape data -> support function -> CollisionContext -> gjk/mprIntersect -> Result
+shape data -> supportInto function -> CollisionContext -> gjk/mprIntersect -> Result
 ```
 
 `examples/collision-source-of-truth.mjs` is the public witness for that policy.
@@ -86,21 +86,24 @@ diagnostic surfaces instead:
 
 ## Support-Mapped Shapes
 
-`gjk`, `epa`, and `mprIntersect` operate on support functions:
+`gjk`, `epa`, and `mprIntersect` use one support-map contract:
 
 ```ts
-type SupportFunction = (direction: Vec3) => Vec3;
+type SupportFunctionInto =
+  (direction: Vec3, out: MutableVec3) => MutableVec3;
 ```
 
-A valid support function returns the farthest point on the convex shape in the
-given direction. It should be deterministic for a fixed direction. For MPR,
+A valid support function writes the farthest point on the convex shape in the
+given direction into `out` and returns `out`. It should be deterministic for a
+fixed direction. Mensura does not expose a second allocating support-function
+contract; older adapters should live at caller boundaries. For MPR,
 `MprShape.center` must be an interior point or a very close approximation of
 one; using an exterior point can break the portal-discovery assumptions.
 
 ## MPR Contract
 
-`mprIntersect(a, b, ctx, maxIterations = 64, tolerance = 1e-9)` implements the
-binary Minkowski Portal Refinement path:
+`mprIntersect(a, b, ctx, maxIterations = 64, tolerance = 1e-9)`
+implements the binary Minkowski Portal Refinement hot path:
 
 1. Build the Minkowski interior point from `a.center - b.center`.
 2. Discover an initial portal that crosses the ray toward the origin.
@@ -118,7 +121,9 @@ case. Neither form implies penetration depth or a full contact manifold.
 
 Use MPR when you have support-mapped convex shapes plus useful interior points
 and only need a boolean intersection decision. Use GJK + EPA when you need a
-penetration normal and depth.
+penetration normal and depth. No allocating wrapper is shipped; hosts that
+still have allocating support maps should adapt them outside Mensura's
+collision core.
 
 ## Sweep Result Contract
 
@@ -146,10 +151,10 @@ editor warning. Hosts such as Geukbit decide how to interpret the hit.
 
 - `simplex` points into `ctx.gjkSimplex`.
 - `simplexSize` tells how many entries are meaningful.
-- The view is valid only until the next `gjk` call using the same context.
+- The view is valid only until the next GJK call using the same context.
 
-`epa(simplex, simplexSize, supportA, supportB, ctx)` expects a real
-4-simplex from an intersecting GJK result. Degenerate inputs return
+`epa(simplex, simplexSize, supportA, supportB, ctx)` expects a real 4-simplex
+from an intersecting GJK result. Degenerate inputs return
 `EPA_DEGENERATE_SIMPLEX`; iteration exhaustion returns `EPA_MAX_ITERATIONS`.
 
 ## Context Ownership
@@ -162,8 +167,8 @@ Good:
 
 ```ts
 const ctx = new CollisionContext();
-const a = gjk(supportA, supportB, ctx);
-const b = mprIntersect(shapeA, shapeB, ctx);
+const a = gjk(supportAInto, supportBInto, ctx);
+const b = mprIntersect(shapeAInto, shapeBInto, ctx);
 ```
 
 Bad:
@@ -171,8 +176,8 @@ Bad:
 ```ts
 // Two concurrent tasks mutate the same scratch vectors.
 await Promise.all([
-  task(() => gjk(supportA, supportB, ctx)),
-  task(() => mprIntersect(shapeA, shapeB, ctx))
+  task(() => gjk(supportAInto, supportBInto, ctx)),
+  task(() => mprIntersect(shapeAInto, shapeBInto, ctx))
 ]);
 ```
 

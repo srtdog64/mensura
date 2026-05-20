@@ -5,7 +5,7 @@ import type { Result } from "../core/result.js";
 import { ok, err } from "../core/result.js";
 import type { CollisionContext } from "./context.js";
 
-export type SupportFunction = (direction: Vec3) => Vec3;
+export type SupportFunctionInto = (direction: Vec3, out: MutableVec3) => MutableVec3;
 
 export interface GjkResult {
   /** True when the Minkowski difference contains the origin. */
@@ -20,21 +20,21 @@ export interface GjkResult {
 }
 
 function gjkSupportInto(
-  supportA: SupportFunction,
-  supportB: SupportFunction,
+  supportA: SupportFunctionInto,
+  supportB: SupportFunctionInto,
   ctx: CollisionContext,
   dir: Vec3,
   out: MutableVec3
 ): MutableVec3 {
   scale3Into(dir, -1, ctx.gjkNegDir);
-  const sA = supportA(dir);
-  const sB = supportB(ctx.gjkNegDir);
-  return sub3Into(sA, sB, out);
+  supportA(dir, ctx.supportA);
+  supportB(ctx.gjkNegDir, ctx.supportB);
+  return sub3Into(ctx.supportA, ctx.supportB, out);
 }
 
 export function gjk(
-  supportA: SupportFunction,
-  supportB: SupportFunction,
+  supportA: SupportFunctionInto,
+  supportB: SupportFunctionInto,
   ctx: CollisionContext,
   maxIterations: number = 64
 ): Result<GjkResult> {

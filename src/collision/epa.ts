@@ -3,7 +3,7 @@ import { dot3, sub3Into, cross3Into, scale3Into } from "../core/vec3.js";
 import type { MutableVec3 } from "../core/vec3.js";
 import type { Result } from "../core/result.js";
 import { ok, err } from "../core/result.js";
-import type { SupportFunction } from "./gjk.js";
+import type { SupportFunctionInto } from "./gjk.js";
 import type { CollisionContext } from "./context.js";
 
 function addSilhouetteEdge(edges: [number, number][], u: number, v: number): void {
@@ -30,23 +30,23 @@ interface Face {
 }
 
 function epaSupportInto(
-  supportA: SupportFunction,
-  supportB: SupportFunction,
+  supportA: SupportFunctionInto,
+  supportB: SupportFunctionInto,
   ctx: CollisionContext,
   dir: Vec3,
   out: MutableVec3
 ): MutableVec3 {
   scale3Into(dir, -1, ctx.epaTemp);
-  const sA = supportA(dir);
-  const sB = supportB(ctx.epaTemp);
-  return sub3Into(sA, sB, out);
+  supportA(dir, ctx.supportA);
+  supportB(ctx.epaTemp, ctx.supportB);
+  return sub3Into(ctx.supportA, ctx.supportB, out);
 }
 
 export function epa(
   simplex: ArrayLike<Vec3>,
   simplexSize: number,
-  supportA: SupportFunction,
-  supportB: SupportFunction,
+  supportA: SupportFunctionInto,
+  supportB: SupportFunctionInto,
   ctx: CollisionContext,
   maxIterations: number = 64
 ): Result<EpaResult> {

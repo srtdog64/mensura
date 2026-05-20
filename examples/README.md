@@ -25,8 +25,12 @@ specific example with `tsx`, `ts-node`, or after `tsc` against
   `SharedArrayBuffer`. Rule-of-thumb decision table at the bottom.
 - [collision-source-of-truth.mjs](collision-source-of-truth.mjs): runnable
   support-mapped collision example. It keeps GJK/MPR as the single canonical
-  implementation and treats shape setup, assertions, workers, and visuals as
-  adapters around that path.
+  `SupportFunctionInto` implementation and treats shape setup, assertions,
+  workers, and visuals as adapters around that path.
+- [geukbit-viewport-dogfood.mjs](geukbit-viewport-dogfood.mjs): Geukbit-style
+  viewport math without Geukbit semantics. It combines camera frustum culling,
+  ray/AABB picking, and bounds measurement while leaving entity ids,
+  selection, placement, and undo policy to the host.
 - [shared-array-buffer-worker.ts](shared-array-buffer-worker.ts): worker
   handoff over `SharedArrayBuffer` with caller-owned `Atomics` publication.
   Mensura kernels run on shared memory; the host owns synchronization.

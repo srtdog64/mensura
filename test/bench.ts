@@ -2,12 +2,23 @@ import { performance } from "perf_hooks";
 import { MAT3_IDENTITY, vec3 } from "../src/core/index.js";
 import { obb } from "../src/geometry/index.js";
 import { testObbObbSat, gjk, epa, CollisionContext } from "../src/collision/index.js";
-import { normalize3, scaleAndAdd3 } from "../src/core/vec3.js";
+import type { MutableVec3, Vec3 } from "../src/core/vec3.js";
+import { lengthSq3 } from "../src/core/vec3.js";
 
-function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
-  return (direction: ReturnType<typeof vec3>) => {
-    const normalized = normalize3(direction);
-    return scaleAndAdd3(center, normalized, radius);
+function sphereSupportInto(center: ReturnType<typeof vec3>, radius: number) {
+  return (direction: Vec3, out: MutableVec3) => {
+    const lenSq = lengthSq3(direction);
+    if (lenSq === 0) {
+      out.x = center.x + radius;
+      out.y = center.y;
+      out.z = center.z;
+      return out;
+    }
+    const scale = radius / Math.sqrt(lenSq);
+    out.x = center.x + direction.x * scale;
+    out.y = center.y + direction.y * scale;
+    out.z = center.z + direction.z * scale;
+    return out;
   };
 }
 
@@ -31,8 +42,8 @@ function runBenchmark() {
   console.log(`SAT (OBB vs OBB) x ${iterations}: ${(end - start).toFixed(2)} ms`);
 
   // 2. Benchmark GJK
-  const supportA = sphereSupport(vec3(0, 0, 0), 1);
-  const supportB = sphereSupport(vec3(1, 0, 0), 1);
+  const supportA = sphereSupportInto(vec3(0, 0, 0), 1);
+  const supportB = sphereSupportInto(vec3(1, 0, 0), 1);
 
   start = performance.now();
   let gjkHits = 0;

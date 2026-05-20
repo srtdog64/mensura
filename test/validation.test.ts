@@ -15,6 +15,11 @@ import {
   validateStableF32,
   validateStableMeasurement,
   validateTriangle,
+  analyzeMeasurement,
+  anchorMeasurement,
+  checkObservationSetSuitability,
+  compareMeasurementToAnchor,
+  measureObservationSet,
   sampleDeterministicRange,
   sampleDeterministicUnit,
   seedFromString,
@@ -170,6 +175,86 @@ describe("validation layer", () => {
     if (checked.ok) {
       expect(checked.value.algorithm).toBe("mulberry32");
       expect(checked.value.range(0, 1, { distribution: "center-biased" })).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("gates observation sets before measurement and comparison", () => {
+    const samples = [9.8, 10.1, 10.0, 10.2, 9.9];
+    const set = {
+      label: "raycast-ms",
+      values: samples,
+      seed: seedFromString("mensura:observation:raycast"),
+      unit: "ms"
+    };
+
+    const suitability = checkObservationSetSuitability(set, {
+      minCount: 5,
+      requireSeed: true,
+      maxRelativeStddev: 0.02
+    });
+    expect(suitability.ok).toBe(true);
+    if (suitability.ok) {
+      expect(suitability.value.label).toBe("raycast-ms");
+      expect(suitability.value.count).toBe(5);
+      expect(suitability.value.unit).toBe("ms");
+    }
+
+    const measurement = measureObservationSet(set, {
+      minCount: 5,
+      requireSeed: true,
+      maxRelativeStddev: 0.02
+    });
+    expect(measurement.ok).toBe(true);
+    if (!measurement.ok) return;
+    expect(measurement.value.median).toBe(10);
+    expect(measurement.value.p75).toBe(10.1);
+    expect(analyzeMeasurement(measurement.value, { maxRelativeStddev: 0.02 }).stable).toBe(true);
+
+    const anchor = anchorMeasurement(
+      {
+        ...measurement.value,
+        mean: 10.5
+      },
+      "previous-raycast-ms",
+      "0.3.0"
+    );
+    const comparison = compareMeasurementToAnchor(measurement.value, anchor, {
+      maxRegressionRatio: 1.05
+    });
+    expect(comparison.ok).toBe(true);
+    if (comparison.ok) {
+      expect(comparison.value.ratio).toBeLessThan(1);
+      expect(comparison.value.anchor.version).toBe("0.3.0");
+    }
+  });
+
+  it("rejects unsuitable observation sets with explicit Result errors", () => {
+    const empty = checkObservationSetSuitability({ label: "empty", values: [] });
+    expect(empty.ok).toBe(false);
+    if (!empty.ok) {
+      expect(empty.error.code).toBe("VALIDATION_OBSERVATION_EMPTY");
+    }
+
+    const tooSmall = checkObservationSetSuitability({ label: "tiny", values: [1, 2] }, { minCount: 3 });
+    expect(tooSmall.ok).toBe(false);
+    if (!tooSmall.ok) {
+      expect(tooSmall.error.code).toBe("VALIDATION_OBSERVATION_INSUFFICIENT");
+    }
+
+    const missingSeed = checkObservationSetSuitability({ label: "unseeded", values: [1, 1, 1] }, {
+      requireSeed: true
+    });
+    expect(missingSeed.ok).toBe(false);
+    if (!missingSeed.ok) {
+      expect(missingSeed.error.code).toBe("VALIDATION_OBSERVATION_MISSING_SEED");
+    }
+
+    const noisy = checkObservationSetSuitability({ label: "noisy", values: [1, 100, 1, 100] }, {
+      maxRelativeStddev: 0.1
+    });
+    expect(noisy.ok).toBe(false);
+    if (!noisy.ok) {
+      expect(noisy.error.code).toBe("VALIDATION_OBSERVATION_UNSTABLE");
     }
   });
 });

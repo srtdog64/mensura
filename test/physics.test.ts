@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { Vec3 } from "../src/core/index.js";
-import { MAT3_IDENTITY, mat3, normalize3, scaleAndAdd3, vec3 } from "../src/core/index.js";
+import type { MutableVec3, Vec3 } from "../src/core/index.js";
+import { MAT3_IDENTITY, mat3, lengthSq3, vec3 } from "../src/core/index.js";
 import type { Obb } from "../src/geometry/index.js";
 import { aabb, obb, ray } from "../src/geometry/index.js";
 import { AccelContext, buildBvh, bvhRaycast } from "../src/accel/index.js";
-import { epa, gjk, testObbObbSat, testObbObbSatTrace, CollisionContext } from "../src/collision/index.js";
+import {
+  epa,
+  gjk,
+  mprIntersect,
+  testObbObbSat,
+  testObbObbSatTrace,
+  CollisionContext
+} from "../src/collision/index.js";
 import { CollisionWorld } from "../src/world/index.js";
 import {
   createDeterministicRng,
@@ -12,19 +19,30 @@ import {
   seedFromString
 } from "../src/validation/index.js";
 
-function sphereSupport(center: ReturnType<typeof vec3>, radius: number) {
-  return (direction: ReturnType<typeof vec3>) => {
-    const normalized = normalize3(direction);
-    return scaleAndAdd3(center, normalized, radius);
+function sphereSupportInto(center: ReturnType<typeof vec3>, radius: number) {
+  return (direction: Vec3, out: MutableVec3) => {
+    const lenSq = lengthSq3(direction);
+    if (lenSq === 0) {
+      out.x = center.x + radius;
+      out.y = center.y;
+      out.z = center.z;
+      return out;
+    }
+    const scale = radius / Math.sqrt(lenSq);
+    out.x = center.x + direction.x * scale;
+    out.y = center.y + direction.y * scale;
+    out.z = center.z + direction.z * scale;
+    return out;
   };
 }
 
-function boxSupport(center: ReturnType<typeof vec3>, halfExtents: ReturnType<typeof vec3>) {
-  return (direction: ReturnType<typeof vec3>) => ({
-    x: center.x + (direction.x >= 0 ? halfExtents.x : -halfExtents.x),
-    y: center.y + (direction.y >= 0 ? halfExtents.y : -halfExtents.y),
-    z: center.z + (direction.z >= 0 ? halfExtents.z : -halfExtents.z)
-  });
+function boxSupportInto(center: ReturnType<typeof vec3>, halfExtents: ReturnType<typeof vec3>) {
+  return (direction: Vec3, out: MutableVec3) => {
+    out.x = center.x + (direction.x >= 0 ? halfExtents.x : -halfExtents.x);
+    out.y = center.y + (direction.y >= 0 ? halfExtents.y : -halfExtents.y);
+    out.z = center.z + (direction.z >= 0 ? halfExtents.z : -halfExtents.z);
+    return out;
+  };
 }
 
 function rotationYMat3(radians: number) {
@@ -42,8 +60,8 @@ function rotationYMat3(radians: number) {
  * Support function for an OBB: project direction into local space, pick the
  * extreme vertex by sign, transform back to world.
  */
-function obbSupport(box: Obb) {
-  return (direction: Vec3) => {
+function obbSupportInto(box: Obb) {
+  return (direction: Vec3, out: MutableVec3) => {
     const r = box.rotation;
     const lx = r[0] * direction.x + r[1] * direction.y + r[2] * direction.z;
     const ly = r[3] * direction.x + r[4] * direction.y + r[5] * direction.z;
@@ -51,11 +69,10 @@ function obbSupport(box: Obb) {
     const sx = lx >= 0 ? box.extents.x : -box.extents.x;
     const sy = ly >= 0 ? box.extents.y : -box.extents.y;
     const sz = lz >= 0 ? box.extents.z : -box.extents.z;
-    return {
-      x: box.center.x + r[0] * sx + r[3] * sy + r[6] * sz,
-      y: box.center.y + r[1] * sx + r[4] * sy + r[7] * sz,
-      z: box.center.z + r[2] * sx + r[5] * sy + r[8] * sz
-    };
+    out.x = box.center.x + r[0] * sx + r[3] * sy + r[6] * sz;
+    out.y = box.center.y + r[1] * sx + r[4] * sy + r[7] * sz;
+    out.z = box.center.z + r[2] * sx + r[5] * sy + r[8] * sz;
+    return out;
   };
 }
 
@@ -211,9 +228,9 @@ describe("Layered collision public surface", () => {
   });
 
   it("detects simple GJK sphere support intersections", () => {
-    const a = sphereSupport(vec3(0, 0, 0), 1);
-    const b = sphereSupport(vec3(1, 0, 0), 1);
-    const c = sphereSupport(vec3(3, 0, 0), 1);
+    const a = sphereSupportInto(vec3(0, 0, 0), 1);
+    const b = sphereSupportInto(vec3(1, 0, 0), 1);
+    const c = sphereSupportInto(vec3(3, 0, 0), 1);
     const ctx = new CollisionContext();
 
     const hit = gjk(a, b, ctx);
@@ -226,10 +243,44 @@ describe("Layered collision public surface", () => {
     if (miss.ok) expect(miss.value.intersect).toBe(false);
   });
 
+  it("runs support-mapped collision through caller-owned support outputs", () => {
+    const sphereA = sphereSupportInto(vec3(0, 0, 0), 1);
+    const sphereB = sphereSupportInto(vec3(1, 0, 0), 1);
+    const boxA = boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1));
+    const boxB = boxSupportInto(vec3(1.5, 0.2, 0.3), vec3(1, 1, 1));
+    const ctx = new CollisionContext();
+
+    const mpr = mprIntersect(
+      { center: vec3(0, 0, 0), supportInto: sphereA },
+      { center: vec3(1, 0, 0), supportInto: sphereB },
+      ctx
+    );
+    const gjkResult = gjk(boxA, boxB, ctx);
+
+    expect(mpr.ok).toBe(true);
+    if (mpr.ok) expect(mpr.value.intersect).toBe(true);
+    expect(gjkResult.ok).toBe(true);
+    if (!gjkResult.ok) return;
+    expect(gjkResult.value.intersect).toBe(true);
+
+    const epaResult = epa(
+      gjkResult.value.simplex,
+      gjkResult.value.simplexSize,
+      boxA,
+      boxB,
+      ctx
+    );
+
+    expect(epaResult.ok).toBe(true);
+    if (epaResult.ok) {
+      expect(epaResult.value.depth).toBeGreaterThan(0);
+    }
+  });
+
   it("detects GJK box support hit and miss", () => {
-    const a = boxSupport(vec3(0, 0, 0), vec3(1, 1, 1));
-    const overlap = boxSupport(vec3(1.5, 0, 0), vec3(1, 1, 1));
-    const separated = boxSupport(vec3(3, 0, 0), vec3(1, 1, 1));
+    const a = boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1));
+    const overlap = boxSupportInto(vec3(1.5, 0, 0), vec3(1, 1, 1));
+    const separated = boxSupportInto(vec3(3, 0, 0), vec3(1, 1, 1));
     const ctx = new CollisionContext();
 
     const hit = gjk(a, overlap, ctx);
@@ -243,8 +294,8 @@ describe("Layered collision public surface", () => {
   });
 
   it("detects containment as GJK intersection", () => {
-    const big = boxSupport(vec3(0, 0, 0), vec3(5, 5, 5));
-    const inside = boxSupport(vec3(0, 0, 0), vec3(1, 1, 1));
+    const big = boxSupportInto(vec3(0, 0, 0), vec3(5, 5, 5));
+    const inside = boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1));
     const ctx = new CollisionContext();
 
     const hit = gjk(big, inside, ctx);
@@ -257,12 +308,12 @@ describe("Layered collision public surface", () => {
   });
 
   it("classifies touching boxes consistently (boundary is non-intersecting)", () => {
-    const a = boxSupport(vec3(0, 0, 0), vec3(1, 1, 1));
+    const a = boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1));
     // boxes share a face at x = 1; origin lies on the Minkowski boundary so
     // the strict-positive support check classifies this as no intersection.
-    const touching = boxSupport(vec3(2, 0, 0), vec3(1, 1, 1));
+    const touching = boxSupportInto(vec3(2, 0, 0), vec3(1, 1, 1));
     // Slightly overlapping pair should be intersecting.
-    const overlapping = boxSupport(vec3(2 - 1e-3, 0, 0), vec3(1, 1, 1));
+    const overlapping = boxSupportInto(vec3(2 - 1e-3, 0, 0), vec3(1, 1, 1));
     const ctx = new CollisionContext();
 
     const touchingResult = gjk(a, touching, ctx);
@@ -277,14 +328,19 @@ describe("Layered collision public surface", () => {
   it("reports GJK max-iteration failure with a non-converging support function", () => {
     // adversarial support: always returns the same point regardless of direction.
     // The Minkowski difference is a single point != origin, so GJK never closes.
-    const stuck = (_direction: ReturnType<typeof vec3>) => vec3(2, 2, 2);
+    const stuck = (_direction: Vec3, out: MutableVec3) => {
+      out.x = 2;
+      out.y = 2;
+      out.z = 2;
+      return out;
+    };
     const ctx = new CollisionContext();
 
     // The first support call separates the origin immediately, so use a tighter
     // pair where the stuck support keeps the simplex incomplete.
     // Pair stuck against a sphere centered nearby: origin is between supports,
     // forcing GJK to iterate without ever building a containing simplex.
-    const sphere = sphereSupport(vec3(1, 1, 1), 0.5);
+    const sphere = sphereSupportInto(vec3(1, 1, 1), 0.5);
 
     // With a tiny iteration budget GJK cannot finish: expect either a max-iter
     // error or a deterministic decision. We assert the function does not throw
@@ -302,7 +358,7 @@ describe("Layered collision public surface", () => {
   });
 
   it("reports degenerate EPA input through Result.error", () => {
-    const support = sphereSupport(vec3(0, 0, 0), 1);
+    const support = sphereSupportInto(vec3(0, 0, 0), 1);
     const ctx = new CollisionContext();
     const result = epa([vec3(0, 0, 0)], 1, support, support, ctx);
 
@@ -315,8 +371,8 @@ describe("Layered collision public surface", () => {
   it("recovers penetration depth from GJK simplex with EPA", () => {
     // Two overlapping unit boxes with a small off-axis offset so the Minkowski
     // difference is a 3D body and GJK terminates with a tetrahedron simplex.
-    const a = boxSupport(vec3(0, 0, 0), vec3(1, 1, 1));
-    const b = boxSupport(vec3(1.5, 0.2, 0.3), vec3(1, 1, 1));
+    const a = boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1));
+    const b = boxSupportInto(vec3(1.5, 0.2, 0.3), vec3(1, 1, 1));
     const ctx = new CollisionContext();
 
     const gjkResult = gjk(a, b, ctx);
@@ -346,8 +402,8 @@ describe("Layered collision public surface", () => {
     // This is the deterministic non-converging witness — an adversarial
     // support function tends to short-circuit earlier in GJK, so the cleanest
     // way to land on the EPA boundary is the explicit iteration budget.
-    const a = boxSupport(vec3(0, 0, 0), vec3(1, 1, 1));
-    const b = boxSupport(vec3(1.5, 0.2, 0.3), vec3(1, 1, 1));
+    const a = boxSupportInto(vec3(0, 0, 0), vec3(1, 1, 1));
+    const b = boxSupportInto(vec3(1.5, 0.2, 0.3), vec3(1, 1, 1));
     const ctx = new CollisionContext();
 
     const hit = gjk(a, b, ctx);
@@ -400,7 +456,7 @@ describe("Layered collision public surface", () => {
       );
 
       const satResult = testObbObbSat(aBox, bBox, ctx);
-      const gjkResult = gjk(obbSupport(aBox), obbSupport(bBox), ctx, 96);
+      const gjkResult = gjk(obbSupportInto(aBox), obbSupportInto(bBox), ctx, 96);
       expect(gjkResult.ok).toBe(true);
       if (!gjkResult.ok) continue;
 

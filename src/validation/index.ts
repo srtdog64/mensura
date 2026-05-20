@@ -16,6 +16,7 @@ import type { Sphere } from "../geometry/sphere.js";
 import { triangleDoubleArea } from "../measure/triangle.js";
 
 export * from "./reproducibility.js";
+export * from "./observation.js";
 
 const DEFAULT_STAGE = "Validation" as const;
 
