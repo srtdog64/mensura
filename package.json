@@ -1,6 +1,6 @@
 {
   "name": "@exornea/mensura",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Spatial math and geometry kernel for TypeScript game and editor runtimes.",
   "license": "MIT",
   "type": "module",
