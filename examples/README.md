@@ -26,3 +26,7 @@ specific example with `tsx`, `ts-node`, or after `tsc` against
 - [shared-array-buffer-worker.ts](shared-array-buffer-worker.ts): worker
   handoff over `SharedArrayBuffer` with caller-owned `Atomics` publication.
   Mensura kernels run on shared memory; the host owns synchronization.
+- [visual-ray-fixtures.mjs](visual-ray-fixtures.mjs): dependency-free visual
+  ray-hit fixtures. `npm run visual:ray` builds the package and writes SVG,
+  2D HTML, 3D Canvas HTML, and a regression-tested JSON manifest to
+  `.mensura-visual/`.

@@ -10,8 +10,8 @@
     "README.md",
     "dist",
     "docs",
-    "perf-benchmark.ts",
-    "scripts/visual-ray-fixtures.mjs"
+    "examples",
+    "perf-benchmark.ts"
   ],
   "exports": [
     ".",

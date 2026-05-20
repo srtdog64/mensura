@@ -38,8 +38,9 @@ Already in place:
   `npm run check:release`.
 - Human visual inspection: `npm run visual:ray` writes dependency-free ray hit
   SVG, 2D HTML, 3D Canvas HTML, and JSON manifest fixtures into ignored
-  `.mensura-visual/`. `test/visual-ray-fixtures.test.ts` keeps the visual
-  manifest values tied to the actual ray API calculations.
+  `.mensura-visual/` through `examples/visual-ray-fixtures.mjs`.
+  `test/visual-ray-fixtures.test.ts` keeps the visual manifest values tied to
+  the actual ray API calculations.
 - Release hardening has started: golden fixtures, deterministic fuzz
   invariants, experimental-module build output (`dist-experimental/`, ignored),
   package export plus `dist/*.d.ts` symbol snapshot, packaged

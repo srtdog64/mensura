@@ -191,7 +191,8 @@ console.log(rayAabbHitDistance(pickRay, bounds));
 ```
 
 Worked examples (camera+frustum, TRS compose/decompose, quaternion operations,
-Result-based error handling) live under [examples/](examples/).
+Result-based error handling, and visual ray fixtures) live under
+[examples/](examples/).
 
 ## Visual Ray Fixtures
 
@@ -201,10 +202,12 @@ Ray hit tests can be inspected without adding browser or graphics dependencies:
 npm run visual:ray
 ```
 
-This builds the package and writes dependency-free SVG, 2D HTML, 3D Canvas
-HTML, and JSON manifest artifacts to `.mensura-visual/`. The artifacts are for
-human review; Vitest keeps a regression test that the rendered manifest values
-match the actual ray API calculations.
+This builds the package and runs
+[examples/visual-ray-fixtures.mjs](examples/visual-ray-fixtures.mjs), writing
+dependency-free SVG, 2D HTML, 3D Canvas HTML, and JSON manifest artifacts to
+`.mensura-visual/`. The artifacts are for human review; Vitest keeps a
+regression test that the rendered manifest values match the actual ray API
+calculations.
 
 ## Performance Snapshot
 

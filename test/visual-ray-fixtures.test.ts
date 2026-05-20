@@ -11,7 +11,7 @@ import {
   createRayVisualFixtures,
   renderRayVisual3dHtml,
   stableStringify
-} from "../scripts/visual-ray-fixtures.mjs";
+} from "../examples/visual-ray-fixtures.mjs";
 
 const api = {
   normalize3,
