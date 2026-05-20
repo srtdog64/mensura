@@ -52,3 +52,4 @@ export {
   sphereIntersectsAabb,
   sphereIntersectsSphere
 } from "../geometry/sphere.js";
+export * from "./aabb-many.js";

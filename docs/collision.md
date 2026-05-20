@@ -54,6 +54,7 @@ keeps those differences explicit:
 | `mprIntersect` | Matches `gjk`: exact touching reports `intersect: false`. |
 | `sweptAabbTimeOfImpact` | Existing overlap or touching at `t = 0` returns `null`; it reports first future contact events. |
 | `sweptSphereTimeOfImpact` | Existing overlap reports `time = 0` with a defined center-offset normal. |
+| `sweptAabbHit` / `sweptSphereHit` | Rich wrappers over the TOI functions. They add contact point, remaining motion, and `startedOverlapping` metadata without changing the underlying TOI policy. |
 
 This is why SAT and GJK/MPR can intentionally disagree on exact boundary cases.
 SAT is usually useful for inclusive overlap tests; GJK and MPR are strict
@@ -93,6 +94,26 @@ does not imply penetration depth.
 Use MPR when you have support-mapped convex shapes plus useful interior points
 and only need a boolean intersection decision. Use GJK + EPA when you need a
 penetration normal and depth.
+
+## Sweep Result Contract
+
+`sweptAabbTimeOfImpact` and `sweptSphereTimeOfImpact` remain the scalar
+source-of-truth functions for continuous collision. Use `sweptAabbHit` and
+`sweptSphereHit` when a caller also needs derived placement data:
+
+```ts
+type SweepHit = {
+  hit: true;
+  time: number;
+  normal: Vec3;
+  point: Vec3;
+  remainingMotion: Vec3;
+  startedOverlapping: boolean;
+};
+```
+
+The `point` is pure geometry: it is not a placement decision, trigger event, or
+editor warning. Hosts such as Geukbit decide how to interpret the hit.
 
 ## GJK / EPA Contract
 

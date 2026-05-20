@@ -7,9 +7,19 @@ export {
   aabbSignedDistanceToPoint
 } from "../geometry/aabb.js";
 export {
+  capsuleCapsuleClosestPoints,
+  capsuleCapsuleClosestPointsInto,
+  capsuleCapsuleContact,
+  capsuleCapsuleContactInto,
+  capsuleCapsuleDistance,
+  capsuleCapsuleSignedDistance,
   capsuleGetAabb,
   capsuleGetAabbInto,
-  capsuleSegmentDistanceSqToPoint
+  capsuleSegmentDistanceSqToPoint,
+  type CapsuleCapsuleContact,
+  type CapsuleSegmentClosestPoints,
+  type MutableCapsuleCapsuleContact,
+  type MutableCapsuleSegmentClosestPoints
 } from "../geometry/capsule.js";
 export {
   obbClosestPoint,

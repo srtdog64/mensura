@@ -285,6 +285,11 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 - predicates: `capsuleContainsPoint`, `capsuleIntersectsSphere` — guarded
   on `radius < 0`. Re-exported by `query`.
 - bounds: `capsuleGetAabb`/`Into` — re-exported by `measure`.
+- capsule pair measurements:
+  `capsuleCapsuleClosestPoints(/Into)`, `capsuleCapsuleDistance`,
+  `capsuleCapsuleSignedDistance`, `capsuleCapsuleContact(/Into)`.
+  Contact data reports surface points, normal from capsule A toward capsule B,
+  clamped distance, signed distance, and `intersects`.
 
 ### `frustum.ts`
 
@@ -303,6 +308,20 @@ Each shape follows the same pattern: `Foo` / `MutableFoo` interfaces,
 - Mesh-level ray queries are built by the caller (index iteration +
   `rayTriangleHit`). For acceleration use `@exornea/mensura/accel`.
 
+### `grid.ts`
+
+Pure spatial-grid coordinate helpers. These do not know about editor snapping,
+selection, placement, triggers, layers, or entity ids.
+
+- `GridSpec`, `GridCell`, `GridCellRange`.
+- `gridSpec(origin, cellSize)`, `gridCell`, `gridCellRange`.
+- `worldToGrid(/Into)` uses `floor`.
+- `gridToWorld(/Into)` returns the cell's minimum world corner.
+- `aabbToGridRange(/Into)` returns the inclusive cell range touched by an
+  AABB; a max corner exactly on a cell boundary stays in the previous cell.
+- `visitGridCellsForAabb` iterates touched cells; `hashGridCell` gives a
+  stable string key.
+
 ---
 
 ## `@exornea/mensura/query` — boolean predicates
@@ -317,6 +336,11 @@ for it when the caller only needs to branch on "is it there?".
   `frustumIntersectsSphere`.
 - Ray hits + intersects: every ray function. `*Hit*` returns data,
   `*Intersects*` returns boolean.
+- Indexed AABB queries:
+  `raycastManyAabb(/Into)`, `nearestRayAabbHit(/Into)`,
+  `overlapManyAabb(/Into)`. They return input indices only; semantic mapping
+  to entities, layers, selection, placement, or trigger policy belongs to the
+  host engine/editor.
 - Sphere: `sphereContainsPoint`, `sphereIntersectsSphere`,
   `sphereIntersectsAabb`.
 
@@ -337,7 +361,9 @@ behaviour see `measure/checked` below.
 
 - AABB: `aabbClosestPoint`/`Into`, `aabbDistanceSqToPoint`,
   `aabbGetBoundingSphere`/`Into`.
-- Capsule: `capsuleGetAabb`/`Into`, `capsuleSegmentDistanceSqToPoint`.
+- Capsule: `capsuleGetAabb`/`Into`, `capsuleSegmentDistanceSqToPoint`,
+  `capsuleCapsuleClosestPoints(/Into)`, `capsuleCapsuleDistance`,
+  `capsuleCapsuleSignedDistance`, `capsuleCapsuleContact(/Into)`.
 - Triangle (`measure/triangle.ts`, own implementation):
   - `triangleNormal`/`Into` — `cross(b - a, c - a)` then normalize.
     Degenerate triangles produce a zero normal.

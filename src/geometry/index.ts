@@ -6,3 +6,4 @@ export * from "./sphere.js";
 export * from "./obb.js";
 export * from "./capsule.js";
 export * from "./triangle-mesh.js";
+export * from "./grid.js";

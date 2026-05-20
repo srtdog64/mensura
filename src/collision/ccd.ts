@@ -8,6 +8,12 @@ export interface TimeOfImpact {
   readonly normal: Vec3;
 }
 
+export interface SweepHit extends TimeOfImpact {
+  readonly point: Vec3;
+  readonly remainingMotion: Vec3;
+  readonly startedOverlapping: boolean;
+}
+
 export interface CcdOptions {
   readonly maxTime?: number;
   readonly epsilon?: number;
@@ -100,6 +106,27 @@ export function sweptAabbTimeOfImpact(
   };
 }
 
+export function sweptAabbHit(
+  moving: Aabb,
+  velocity: Vec3,
+  target: Aabb,
+  options: CcdOptions = {}
+): SweepHit | null {
+  const toi = sweptAabbTimeOfImpact(moving, velocity, target, options);
+  if (!toi) {
+    return null;
+  }
+  const maxTime = options.maxTime ?? 1;
+  return {
+    hit: true,
+    time: toi.time,
+    normal: toi.normal,
+    point: sweptAabbContactPoint(moving, velocity, target, toi.time, toi.normal),
+    remainingMotion: scaleVector(velocity, maxTime - toi.time),
+    startedOverlapping: false
+  };
+}
+
 /**
  * Swept sphere–sphere time of impact under a constant relative velocity.
  *
@@ -165,6 +192,36 @@ export function sweptSphereTimeOfImpact(
   };
 }
 
+export function sweptSphereHit(
+  moving: Sphere,
+  velocity: Vec3,
+  target: Sphere,
+  options: CcdOptions = {}
+): SweepHit | null {
+  const toi = sweptSphereTimeOfImpact(moving, velocity, target, options);
+  if (!toi) {
+    return null;
+  }
+  const maxTime = options.maxTime ?? 1;
+  const movedCenter = {
+    x: moving.center.x + velocity.x * toi.time,
+    y: moving.center.y + velocity.y * toi.time,
+    z: moving.center.z + velocity.z * toi.time
+  };
+  return {
+    hit: true,
+    time: toi.time,
+    normal: toi.normal,
+    point: {
+      x: movedCenter.x - toi.normal.x * moving.radius,
+      y: movedCenter.y - toi.normal.y * moving.radius,
+      z: movedCenter.z - toi.normal.z * moving.radius
+    },
+    remainingMotion: scaleVector(velocity, maxTime - toi.time),
+    startedOverlapping: toi.time === 0 && spheresOverlap(moving, target)
+  };
+}
+
 function axisValue(value: Vec3, axis: number): number {
   return axis === 0 ? value.x : axis === 1 ? value.y : value.z;
 }
@@ -173,6 +230,52 @@ function axisNormal(axis: number, sign: number): Vec3 {
   if (axis === 0) return { x: sign, y: 0, z: 0 };
   if (axis === 1) return { x: 0, y: sign, z: 0 };
   return { x: 0, y: 0, z: sign };
+}
+
+function sweptAabbContactPoint(moving: Aabb, velocity: Vec3, target: Aabb, time: number, normal: Vec3): Vec3 {
+  const min = {
+    x: moving.min.x + velocity.x * time,
+    y: moving.min.y + velocity.y * time,
+    z: moving.min.z + velocity.z * time
+  };
+  const max = {
+    x: moving.max.x + velocity.x * time,
+    y: moving.max.y + velocity.y * time,
+    z: moving.max.z + velocity.z * time
+  };
+  return {
+    x: contactAxisPoint(normal.x, min.x, max.x, target.min.x, target.max.x),
+    y: contactAxisPoint(normal.y, min.y, max.y, target.min.y, target.max.y),
+    z: contactAxisPoint(normal.z, min.z, max.z, target.min.z, target.max.z)
+  };
+}
+
+function contactAxisPoint(normalComponent: number, movingMin: number, movingMax: number, targetMin: number, targetMax: number): number {
+  if (normalComponent < 0) {
+    return movingMax;
+  }
+  if (normalComponent > 0) {
+    return movingMin;
+  }
+  const overlapMin = Math.max(movingMin, targetMin);
+  const overlapMax = Math.min(movingMax, targetMax);
+  return (overlapMin + overlapMax) * 0.5;
+}
+
+function scaleVector(value: Vec3, scalar: number): Vec3 {
+  return {
+    x: value.x * scalar,
+    y: value.y * scalar,
+    z: value.z * scalar
+  };
+}
+
+function spheresOverlap(a: Sphere, b: Sphere): boolean {
+  const dx = a.center.x - b.center.x;
+  const dy = a.center.y - b.center.y;
+  const dz = a.center.z - b.center.z;
+  const radius = a.radius + b.radius;
+  return dx * dx + dy * dy + dz * dz <= radius * radius;
 }
 
 /**

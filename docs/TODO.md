@@ -9,12 +9,14 @@ Already in place:
 
 - `core`: float policy, conversion loss, vec3/vec4, mat3/mat4, quat, euler,
   dual-quat, WebGPU viewport project/unproject helpers, `Result`.
-- `geometry`: ray, plane, AABB, sphere, OBB, capsule, frustum, triangle mesh.
-- `query`: ray hit data, ray/plane/AABB/sphere/triangle tests, frustum tests.
+- `geometry`: ray, plane, AABB, sphere, OBB, capsule, frustum, triangle mesh,
+  and pure spatial grid coordinate helpers.
+- `query`: ray hit data, ray/plane/AABB/sphere/triangle tests, frustum tests,
+  indexed AABB raycast/nearest-hit/overlap primitives.
 - `measure`: closest points, bounds, triangle helpers, and signed distance
   helpers for AABB/sphere surfaces.
-- `collision`: SAT, GJK, EPA, MPR, and CCD with caller-owned
-  `CollisionContext`.
+- `collision`: SAT, GJK, EPA, MPR, scalar CCD, and rich sweep hit wrappers
+  with caller-owned `CollisionContext`.
 - `accel`: median and SAH BVH builders with caller-owned `AccelContext`, ray
   traversal, and broadphase overlap pair generation.
 - `world`: `CollisionWorld` orchestration over bodies, BVH, raycast, and
@@ -137,7 +139,9 @@ Filled the previously empty cells in the shape-pair matrix:
 - Capsule predicates ship in `geometry/capsule.ts`; derived bounds/distance
   projections are exposed from `measure`:
   `capsuleContainsPoint`, `capsuleIntersectsSphere`,
-  `capsuleSegmentDistanceSqToPoint`, `capsuleGetAabb(Into)`.
+  `capsuleSegmentDistanceSqToPoint`, `capsuleGetAabb(Into)`,
+  `capsuleCapsuleClosestPoints(Into)`, `capsuleCapsuleDistance`,
+  `capsuleCapsuleSignedDistance`, `capsuleCapsuleContact(Into)`.
 - Frustum extraction:
   - WebGPU forward-Z remains the default.
   - Reverse-Z perspective ships as `mat4PerspectiveReverseZWebGpuRh(Into)`.
