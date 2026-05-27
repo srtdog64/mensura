@@ -167,6 +167,37 @@ Projection matrices live in `@exornea/mensura/gpu`
 
 > 실패 가능 호출만 `Result`. 산술은 그대로 반환.
 
+### `transform3.ts` — semantic TRS records
+
+Inspectable transform components over the same `M = T * R * S` convention as
+`mat4Compose`. This layer does not duplicate matrix math; it is a named record
+for callers that need stable `translation`, `rotation`, and `scale` fields.
+
+- ctor / constants: `transform3`, `mutableTransform3`,
+  `transform3Identity`/`Into`, `TRANSFORM3_IDENTITY`.
+- copy: `transform3Copy`/`Into`. Nested values are copied so source records do
+  not alias output records.
+- matrix bridge: `transform3ToMat4`/`Into` delegates to `mat4Compose`.
+  `transform3FromMat4`/`Into` delegates to `mat4DecomposeInto`.
+- checked matrix bridge: `transform3FromMat4Checked`/`Into` returns
+  `Result<MutableTransform3>`. It rejects non-finite matrix components with
+  `VALIDATION_MAT4_NON_FINITE`, invalid `minAxisScaleSq` options with
+  `VALIDATION_INVALID_RANGE`, and near-zero axis scale with
+  `TRANSFORM_SINGULAR`.
+- direct apply: `transform3TransformPoint3`/`Into` expands `T * R * S`
+  without composing an intermediate matrix. `transform3TransformDirection3`/
+  `Into` applies scale and rotation while ignoring translation. Both `Into`
+  variants are aliasing-safe.
+- composition: `transform3Multiply`/`Into` composes in `M_a * M_b` order by
+  routing through the canonical mat4 path. It is exact for ordinary TRS cases
+  without shear; non-uniform scale plus rotation can produce shear and the
+  returned TRS is therefore a lossy decomposition. The `Into` variant takes
+  caller-owned mat4 scratch buffers.
+
+Use `transform3` at semantic boundaries such as editor state, imported asset
+data, or Geukbit viewport dogfood. Use `mat4` directly when a matrix is already
+the source of truth or the caller needs arbitrary affine/sheared transforms.
+
 ### `quat.ts` — unit quaternions
 
 Stored as `vec4`. Hamilton product convention.

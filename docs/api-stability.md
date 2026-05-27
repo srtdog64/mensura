@@ -18,7 +18,7 @@ These layers are the primary public surface for `0.3.x`:
 
 | Subpath | Status | Notes |
 |---|---|---|
-| `@exornea/mensura/core` | Stable 0.3 | Float policy, `Result`, vec3/vec4, mat3/mat4, quat, euler, dual-quat. |
+| `@exornea/mensura/core` | Stable 0.3 | Float policy, `Result`, vec3/vec4, mat3/mat4, quat, transform3, euler, dual-quat. |
 | `@exornea/mensura/geometry` | Stable 0.3 | Shape construction and primitive geometry values. |
 | `@exornea/mensura/query` | Stable 0.3 | Ray hits, overlap tests, and frustum culling helpers. |
 | `@exornea/mensura/measure` | Stable 0.3 | Derived primitive measurements and projections such as AABB closest point, capsule bounds, triangle area, normal, barycentric coordinates, closest point, and `Result`-first `*Checked` measurement wrappers. |

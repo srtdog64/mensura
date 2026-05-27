@@ -14,7 +14,7 @@ Mensura owns reusable math primitives:
 
 - floating-point comparison and ULP helpers
 - conversion loss functions for `number -> f32`
-- vectors, quaternions, and matrices
+- vectors, quaternions, matrices, and semantic TRS transforms
 - rays, planes, AABBs, spheres, and frustums
 - intersection and overlap tests
 - closest-point, bounds, and signed-distance measurements
@@ -57,7 +57,7 @@ See [Coordinate And Matrix Policy](docs/coordinate-matrix-conventions.md).
 
 ```txt
 @exornea/mensura           facade for the stable kernel surface
-@exornea/mensura/core      float, vector, and matrix math
+@exornea/mensura/core      float, vector, matrix, quaternion, and transform math
 @exornea/mensura/geometry  shape primitives: rays, planes, bounds, spheres
 @exornea/mensura/query     ray hits, overlap tests, frustum culling
 @exornea/mensura/collision SAT, GJK, EPA, MPR, and CCD narrowphase
@@ -95,6 +95,12 @@ compatibility facade for older imports, but new code should import `query`, `col
 `accel`, and `world` by responsibility. `measure` owns derived primitive
 measurements and projections such as AABB closest points, capsule bounds,
 triangle normals, areas, barycentric coordinates, and triangle closest points.
+`core/transform3` owns semantic translation/rotation/scale records and bridges
+them to the canonical `mat4Compose` / `mat4Decompose` convention. Use it when a
+caller needs inspectable transform components; use `mat4` directly when the
+matrix is already the source of truth. `Transform3` also has direct point and
+direction application helpers, a checked matrix-decompose path, and a documented
+lossy composition caveat for transforms whose matrix product contains shear.
 It also exposes `*Checked` variants for boundary callers that want invalid
 measure domains surfaced as `Result` errors.
 `validation` owns `Result`-first precondition checks for finite values,
@@ -149,7 +155,9 @@ type Result<T> =
 Common error codes: `VALIDATION_INVALID_FORMAT` (bad perspective arguments),
 `TRANSFORM_SINGULAR` (`det = 0` inversion), `TRANSFORM_DEGENERATE_BASIS`
 (`lookAt` with `eye = center`, `quatFromUnitVectors` anti-parallel without a
-stable axis), `GJK_MAX_ITERATIONS`, `EPA_MAX_ITERATIONS`, and
+stable axis), `VALIDATION_MAT4_NON_FINITE` and `VALIDATION_INVALID_RANGE`
+(`transform3FromMat4Checked` boundary validation), `GJK_MAX_ITERATIONS`,
+`EPA_MAX_ITERATIONS`, and
 `MPR_MAX_ITERATIONS` for collision iteration budgets.
 
 `MensuraError.code` and `MensuraError.stage` are typed literal unions, not raw

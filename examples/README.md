@@ -15,8 +15,10 @@ specific example with `tsx`, `ts-node`, or after `tsc` against
 
 - [camera-projection.ts](camera-projection.ts): RH view + WebGPU `0..1`
   perspective + frustum-AABB culling + ray-AABB picking.
-- [transform-trs.ts](transform-trs.ts): `mat4Compose` / `mat4Decompose`
-  roundtrip and `det < 0 -> scale.x` flip behaviour.
+- [transform-trs.ts](transform-trs.ts): `transform3` semantic TRS records,
+  direct point application, checked matrix decomposition, and the
+  `mat4Compose` / `mat4Decompose` roundtrip with `det < 0 -> scale.x`
+  flip behaviour.
 - [quaternion-ops.ts](quaternion-ops.ts): `quatFromUnitVectors`,
   `quatConjugate`, `quatSlerp` with the lerp-fallback threshold.
 - [error-handling.ts](error-handling.ts): `Result<T>` patterns: `unwrap`,

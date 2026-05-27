@@ -56,6 +56,14 @@ M_viewProjection = P * V
 M_modelViewProjection = P * V * M
 ```
 
+`Transform3` is the semantic record for the same TRS policy:
+`translation`, `rotation`, and `scale` bridge to matrices through
+`mat4Compose`, and matrices bridge back through `mat4Decompose`. It is not a
+separate transform convention. If two TRS records are composed and the true
+matrix product contains shear, `transform3Multiply` decomposes back into a TRS
+approximation and the shear is not preserved. Keep arbitrary affine transforms
+as `mat4` values when that information matters.
+
 Matrix documentation may display elements in normal row/column notation:
 
 ```txt

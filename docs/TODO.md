@@ -7,8 +7,9 @@ the current package shape, not the historical reference-reading checklist.
 
 Already in place:
 
-- `core`: float policy, conversion loss, vec3/vec4, mat3/mat4, quat, euler,
-  dual-quat, WebGPU viewport project/unproject helpers, `Result`.
+- `core`: float policy, conversion loss, vec3/vec4, mat3/mat4, quat,
+  transform3, euler, dual-quat, WebGPU viewport project/unproject helpers,
+  `Result`.
 - `geometry`: ray, plane, AABB, sphere, OBB, capsule, frustum, triangle mesh,
   and pure spatial grid coordinate helpers.
 - `query`: ray hit data, ray/plane/AABB/sphere/triangle tests, frustum tests,
@@ -200,9 +201,9 @@ into a professional-grade math library. These items are not all required for a
 ### API Breadth
 
 - Keep the stable public core complete and boring:
-  `vec2/3/4`, `mat3/4`, `quat`, euler, dual-quat, transform compose,
-  transform decompose, inversion, look-at, projection, unprojection, and
-  affine transform helpers.
+  `vec2/3/4`, `mat3/4`, `quat`, `transform3`, euler, dual-quat, transform
+  compose, transform decompose, inversion, look-at, projection, unprojection,
+  and affine transform helpers.
 - Keep shape primitives cohesive:
   ray, plane, AABB, OBB, sphere, capsule, triangle, triangle mesh, frustum,
   and support-mapped convex shape contracts.
